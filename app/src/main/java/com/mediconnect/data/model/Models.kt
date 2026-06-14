@@ -49,8 +49,9 @@ data class LoginRequest(
 @Serializable
 data class AuthResponse(
     val success: Boolean,
-    val data: AuthData,
-    val message: String? = null
+    val data: AuthData? = null,
+    val message: String? = null,
+    val error: String? = null
 )
 
 @Serializable

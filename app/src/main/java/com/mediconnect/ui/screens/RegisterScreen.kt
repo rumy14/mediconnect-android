@@ -100,12 +100,27 @@ fun RegisterScreen(navController: NavController) {
                                         phone = phone.trim()
                                     )
                                 )
-                                api.setToken(response.data.token)
-                                navController.navigate(Screen.Home.route) {
-                                    popUpTo(Screen.Register.route) { inclusive = true }
+                                if (response.success && response.data != null) {
+                                    api.setToken(response.data.token)
+                                    navController.navigate(Screen.Home.route) {
+                                        popUpTo(Screen.Register.route) { inclusive = true }
+                                    }
+                                } else {
+                                    val friendlyMsg = response.error
+                                        ?: response.message
+                                        ?: "Something went wrong. Please try again."
+                                    errorMsg = friendlyMsg
+                                    loading = false
                                 }
                             } catch (e: Exception) {
-                                errorMsg = "Registration failed: ${e.message ?: "Unknown error"}"
+                                val msg = e.message ?: ""
+                                errorMsg = when {
+                                    msg.contains("401") -> "Session expired. Please restart the app."
+                                    msg.contains("409") -> "An account with this email already exists."
+                                    msg.contains("timeout") -> "Request timed out. Check your internet and try again."
+                                    msg.contains("resolve") || msg.contains("connect") -> "Could not reach server. Check your internet connection."
+                                    else -> "Something went wrong. Please try again later."
+                                }
                                 loading = false
                             }
                         }
