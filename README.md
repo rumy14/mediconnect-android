@@ -15,8 +15,9 @@ Native Android appointment booking app for a medical consultancy firm. Built wit
 
 1. Open in **Android Studio Ladybug (2024.3)** or newer
 2. Let Gradle sync complete
-3. Update `API_BASE_URL` in `app/build.gradle.kts` if needed
-4. Run on emulator or device
+3. Run on emulator or device (API already configured for `https://mediconnect.nma-it.com/api/`)
+
+> 💡 The API is live at `https://mediconnect.nma-it.com`. Health check: [https://mediconnect.nma-it.com/api/health](https://mediconnect.nma-it.com/api/health)
 
 ## Project Structure
 

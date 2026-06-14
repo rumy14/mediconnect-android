@@ -16,8 +16,8 @@ android {
         versionCode = 1
         versionName = "1.0.0"
 
-        // ✅ Update this to your API server URL
-        buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:4000/api/\"")
+        // ✅ Live API server
+        buildConfigField("String", "API_BASE_URL", "\"https://mediconnect.nma-it.com/api/\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -29,7 +29,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            buildConfigField("String", "API_BASE_URL", "\"https://api.mediconnect.com/api/\"")
+            buildConfigField("String", "API_BASE_URL", "\"https://mediconnect.nma-it.com/api/\"")
         }
     }
 
