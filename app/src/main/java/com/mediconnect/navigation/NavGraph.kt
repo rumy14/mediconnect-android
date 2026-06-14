@@ -2,8 +2,10 @@ package com.mediconnect.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
 import com.mediconnect.ui.screens.*
 
 @Composable
@@ -28,7 +30,9 @@ fun MediConnectNavGraph(navController: NavHostController) {
 
         composable(
             route = Screen.DoctorDetail.route,
-            arguments = listOf(androidx.navigation.NavType.StringType to "doctorId")
+            arguments = listOf(
+                navArgument("doctorId") { type = NavType.StringType }
+            )
         ) {
             DoctorDetailScreen(navController = navController)
         }
@@ -36,9 +40,9 @@ fun MediConnectNavGraph(navController: NavHostController) {
         composable(
             route = Screen.Booking.route,
             arguments = listOf(
-                androidx.navigation.NavType.StringType to "doctorId",
-                androidx.navigation.NavType.StringType to "date",
-                androidx.navigation.NavType.StringType to "startTime"
+                navArgument("doctorId") { type = NavType.StringType },
+                navArgument("date") { type = NavType.StringType },
+                navArgument("startTime") { type = NavType.StringType }
             )
         ) {
             BookingScreen(navController = navController)
@@ -50,9 +54,10 @@ fun MediConnectNavGraph(navController: NavHostController) {
 
         composable(
             route = Screen.AppointmentDetail.route,
-            arguments = listOf(androidx.navigation.NavType.StringType to "appointmentId")
+            arguments = listOf(
+                navArgument("appointmentId") { type = NavType.StringType }
+            )
         ) {
-            // Placeholder — full detail view
             AppointmentsScreen(navController = navController)
         }
 
