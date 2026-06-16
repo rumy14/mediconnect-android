@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.mediconnect.data.api.MediConnectApi
 import com.mediconnect.data.model.RegisterRequest
+import com.mediconnect.data.session.SessionManager
 import com.mediconnect.navigation.Screen
 import kotlinx.coroutines.launch
 
@@ -28,7 +29,8 @@ import kotlinx.coroutines.launch
 fun RegisterScreen(navController: NavController) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val api = remember { MediConnectApi() }
+    val api = remember { MediConnectApi.getInstance() }
+    val session = remember { SessionManager.getInstance(context) }
 
     var firstName by remember { mutableStateOf("") }
     var lastName by remember { mutableStateOf("") }
@@ -102,6 +104,7 @@ fun RegisterScreen(navController: NavController) {
                                 )
                                 if (response.success && response.data != null) {
                                     api.setToken(response.data.token)
+                                    session.saveSession(response.data.token, response.data.user)
                                     navController.navigate(Screen.Home.route) {
                                         popUpTo(Screen.Register.route) { inclusive = true }
                                     }

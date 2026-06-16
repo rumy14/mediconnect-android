@@ -11,15 +11,21 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.mediconnect.data.session.SessionManager
 import com.mediconnect.navigation.Screen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(navController: NavController) {
+    val context = LocalContext.current
+    val session = remember { SessionManager.getInstance(context) }
+    val userName by session.userNameFlow.collectAsState(initial = null)
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -74,7 +80,12 @@ fun HomeScreen(navController: NavController) {
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
                 ) {
                     Column(modifier = Modifier.padding(20.dp)) {
-                        Text("Welcome to MediConnect", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        Text(
+                            text = if (userName != null) "Welcome, ${userName}!" else "Welcome to MediConnect",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text("Book appointments with top doctors in your area.", fontSize = 14.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f))
                     }

@@ -16,7 +16,19 @@ import kotlinx.serialization.json.Json
  * MediConnect REST API client.
  * Uses Ktor for lightweight, coroutine-native HTTP.
  */
-class MediConnectApi {
+class MediConnectApi private constructor() {
+
+    companion object {
+        @Volatile
+        private var instance: MediConnectApi? = null
+
+        /** Get or create the singleton API client. */
+        fun getInstance(): MediConnectApi {
+            return instance ?: synchronized(this) {
+                instance ?: MediConnectApi().also { instance = it }
+            }
+        }
+    }
 
     private val json = Json {
         ignoreUnknownKeys = true
