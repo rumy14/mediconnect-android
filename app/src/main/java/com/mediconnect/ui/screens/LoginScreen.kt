@@ -1,16 +1,24 @@
 package com.mediconnect.ui.screens
 
-import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -24,6 +32,18 @@ import com.mediconnect.data.model.LoginRequest
 import com.mediconnect.data.session.SessionManager
 import com.mediconnect.navigation.Screen
 import kotlinx.coroutines.launch
+
+// Custom colors for the dark teal theme
+private val TealStart = Color(0xFF0D4F4F)       // Dark teal top
+private val TealEnd = Color(0xFF0A1628)          // Deep navy bottom
+private val CardBg = Color(0xFF0F1E33)           // Card background
+private val InputBg = Color(0xFF162A45)           // Input field background
+private val AccentTeal = Color(0xFF1EB9B9)        // Button / accent teal
+private val GoldenOutline = Color(0xFFC8A45C)     // Golden-brown outline
+private val PillBg = Color(0xFF1A3A5C)            // Light blue pill bg
+private val White85 = Color.White.copy(alpha = 0.85f)
+private val White60 = Color.White.copy(alpha = 0.60f)
+private val White30 = Color.White.copy(alpha = 0.30f)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,7 +62,11 @@ fun LoginScreen(navController: NavController) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(TealStart, TealEnd)
+                )
+            )
     ) {
         Column(
             modifier = Modifier
@@ -51,183 +75,250 @@ fun LoginScreen(navController: NavController) {
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(60.dp))
+            Spacer(modifier = Modifier.height(56.dp))
 
-            // Brand
-            Text(
-                text = "◆",
-                fontSize = 28.sp,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "MediConnect",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Text(
-                text = "Doctor Appointment Booking",
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 40.dp)
-            )
-
-            // Error message
-            errorMsg?.let {
-                Text(
-                    it,
-                    color = MaterialTheme.colorScheme.error,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-            }
-
-            // Email
-            OutlinedTextField(
-                value = email,
-                onValueChange = { email = it; errorMsg = null },
-                label = { Text("Email") },
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Email,
-                    imeAction = ImeAction.Next
-                ),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !loading
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Password
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it; errorMsg = null },
-                label = { Text("Password") },
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Password,
-                    imeAction = ImeAction.Done
-                ),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !loading
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Login button
-            Button(
-                onClick = {
-                    errorMsg = null
-                    when {
-                        email.isBlank() -> errorMsg = "Email is required"
-                        !email.contains("@") -> errorMsg = "Enter a valid email address"
-                        password.isBlank() -> errorMsg = "Password is required"
-                        password.length < 6 -> errorMsg = "Password must be at least 6 characters"
-                        else -> {
-                            loading = true
-                            scope.launch {
-                                try {
-                                    val response = api.login(
-                                        LoginRequest(
-                                            email = email.trim(),
-                                            password = password
-                                        )
-                                    )
-                                    if (response.success && response.data != null) {
-                                        api.setToken(response.data.token)
-                                        session.saveSession(response.data.token, response.data.user)
-                                        navController.navigate(Screen.Home.route) {
-                                            popUpTo(Screen.Login.route) { inclusive = true }
-                                        }
-                                    } else {
-                                        errorMsg = response.error
-                                            ?: response.message
-                                            ?: "Invalid email or password"
-                                        loading = false
-                                    }
-                                } catch (e: Exception) {
-                                    val msg = e.message ?: ""
-                                    errorMsg = when {
-                                        msg.contains("401") -> "Invalid email or password"
-                                        msg.contains("timeout") -> "Connection timed out. Check your internet."
-                                        msg.contains("resolve") || msg.contains("connect") -> "Could not reach the server. Check your connection."
-                                        else -> "Something went wrong. Please try again."
-                                    }
-                                    loading = false
-                                }
-                            }
-                        }
-                    }
-                },
-                enabled = !loading,
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = MaterialTheme.shapes.medium
+            // Header: Cross icon + brand
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(bottom = 4.dp)
             ) {
-                if (loading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Text("Sign In", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                }
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-
-            TextButton(onClick = { navController.navigate(Screen.Register.route) }) {
-                Text("Don't have an account? Register")
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Divider
-            HorizontalDivider(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                color = MaterialTheme.colorScheme.outlineVariant
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // AI Voice Assistant button — prominent card style
-            OutlinedCard(
-                onClick = { showAiVoice = true },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.outlinedCardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                )
-            ) {
-                Row(
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(AccentTeal),
+                    contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "🎤",
-                        fontSize = 22.sp
+                        text = "+",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
                     )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column {
-                        Text(
-                            text = "Talk to AI Assistant",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = "MediConnect",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            }
+            Text(
+                text = "Your Healthcare Connection",
+                fontSize = 13.sp,
+                color = White60
+            )
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Card container
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = CardBg),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 28.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // User icon
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(White30),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Person,
+                            contentDescription = null,
+                            tint = White60,
+                            modifier = Modifier.size(28.dp)
                         )
+                    }
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Text(
+                        text = "Sign In to Your Account",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Error message
+                    errorMsg?.let {
                         Text(
-                            text = "Ask questions, get help",
+                            it,
+                            color = MaterialTheme.colorScheme.error,
                             fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            modifier = Modifier.padding(bottom = 8.dp)
                         )
+                    }
+
+                    // Email field
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = { email = it; errorMsg = null },
+                        label = { Text("Email", color = White60) },
+                        leadingIcon = {
+                            Icon(Icons.Default.Email, contentDescription = null, tint = White60)
+                        },
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Email,
+                            imeAction = ImeAction.Next
+                        ),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !loading,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = AccentTeal,
+                            unfocusedBorderColor = Color.Transparent,
+                            cursorColor = AccentTeal,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedContainerColor = InputBg,
+                            unfocusedContainerColor = InputBg
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Password field
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it; errorMsg = null },
+                        label = { Text("Password", color = White60) },
+                        leadingIcon = {
+                            Icon(Icons.Default.Lock, contentDescription = null, tint = White60)
+                        },
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Password,
+                            imeAction = ImeAction.Done
+                        ),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !loading,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = AccentTeal,
+                            unfocusedBorderColor = Color.Transparent,
+                            cursorColor = AccentTeal,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedContainerColor = InputBg,
+                            unfocusedContainerColor = InputBg
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Sign In button
+                    Button(
+                        onClick = {
+                            errorMsg = null
+                            when {
+                                email.isBlank() -> errorMsg = "Email is required"
+                                !email.contains("@") -> errorMsg = "Enter a valid email address"
+                                password.isBlank() -> errorMsg = "Password is required"
+                                password.length < 6 -> errorMsg = "Password must be at least 6 characters"
+                                else -> {
+                                    loading = true
+                                    scope.launch {
+                                        try {
+                                            val response = api.login(
+                                                LoginRequest(
+                                                    email = email.trim(),
+                                                    password = password
+                                                )
+                                            )
+                                            if (response.success && response.data != null) {
+                                                api.setToken(response.data.token)
+                                                session.saveSession(response.data.token, response.data.user)
+                                                navController.navigate(Screen.Home.route) {
+                                                    popUpTo(Screen.Login.route) { inclusive = true }
+                                                }
+                                            } else {
+                                                errorMsg = response.error ?: response.message ?: "Invalid email or password"
+                                                loading = false
+                                            }
+                                        } catch (e: Exception) {
+                                            val msg = e.message ?: ""
+                                            errorMsg = when {
+                                                msg.contains("401") -> "Invalid email or password"
+                                                msg.contains("timeout") -> "Connection timed out"
+                                                msg.contains("resolve") || msg.contains("connect") -> "No internet connection"
+                                                else -> "Something went wrong"
+                                            }
+                                            loading = false
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        enabled = !loading,
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentTeal)
+                    ) {
+                        if (loading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = Color.White,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text("Sign In", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Register link
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text("Don't have an account? ", fontSize = 13.sp, color = White60)
+                        TextButton(
+                            onClick = { navController.navigate(Screen.Register.route) },
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text("Register", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AccentTeal)
+                        }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.weight(1f))
+
+            // AI Voice Assistant pill button
+            OutlinedButton(
+                onClick = { showAiVoice = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .padding(bottom = 16.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = PillBg,
+                    contentColor = Color.White
+                ),
+                border = BorderStroke(1.dp, GoldenOutline)
+            ) {
+                Text(
+                    text = "🎤",
+                    fontSize = 16.sp
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Talk to AI Assistant",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
     }
 
