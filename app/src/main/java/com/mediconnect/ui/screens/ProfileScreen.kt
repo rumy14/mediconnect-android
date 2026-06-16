@@ -2,25 +2,48 @@ package com.mediconnect.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.mediconnect.data.api.MediConnectApi
+import com.mediconnect.data.model.UserResponse
+import com.mediconnect.data.session.SessionManager
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(navController: NavController) {
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val session = remember { SessionManager.getInstance(context) }
+    val api = remember { MediConnectApi.getInstance() }
+
+    var user by remember { mutableStateOf<UserResponse?>(null) }
+    var loading by remember { mutableStateOf(true) }
+
+    // Load user profile
+    LaunchedEffect(Unit) {
+        try {
+            val resp = api.getMe()
+            if (resp.success) user = resp.data
+        } catch (_: Exception) { }
+        loading = false
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Profile", fontWeight = FontWeight.Bold) },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
-                navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") } }
+                navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } }
             )
         }
     ) { padding ->
@@ -30,6 +53,14 @@ fun ProfileScreen(navController: NavController) {
         ) {
             Spacer(modifier = Modifier.height(20.dp))
 
+            if (loading) {
+                CircularProgressIndicator()
+                return@Column
+            }
+
+            val u = user
+
+            // Avatar
             Surface(
                 modifier = Modifier.size(88.dp),
                 shape = MaterialTheme.shapes.large,
@@ -40,22 +71,40 @@ fun ProfileScreen(navController: NavController) {
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
-            Text("John Doe", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            Text("john@example.com", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                if (u != null) "${u.firstName} ${u.lastName}" else "User",
+                fontSize = 22.sp, fontWeight = FontWeight.Bold
+            )
+            Text(
+                u?.email ?: "",
+                fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (u?.phone != null) {
+                Text(u.phone, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
 
             Spacer(modifier = Modifier.height(32.dp))
             HorizontalDivider()
 
-            ProfileMenuItem(Icons.Default.Person, "Personal Information")
-            ProfileMenuItem(Icons.Default.Notifications, "Notifications")
-            ProfileMenuItem(Icons.Default.Settings, "Settings")
-            ProfileMenuItem(Icons.Default.Info, "About")
-            ProfileMenuItem(Icons.Default.HelpOutline, "Help & Support")
+            // Info rows
+            ProfileInfoRow(Icons.Default.Person, "Role", u?.role?.replaceFirstChar { it.uppercase() } ?: "Patient")
+            if (u?.createdAt != null) {
+                ProfileInfoRow(Icons.Default.CalendarMonth, "Member since", u.createdAt.take(10))
+            }
 
             Spacer(modifier = Modifier.weight(1f))
 
+            // Sign Out button
             OutlinedButton(
-                onClick = { navController.popBackStack() },
+                onClick = {
+                    scope.launch {
+                        session.clearSession()
+                        api.setToken(null)
+                        navController.navigate("login") {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
+                },
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = MaterialTheme.shapes.medium,
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
@@ -69,16 +118,21 @@ fun ProfileScreen(navController: NavController) {
 }
 
 @Composable
-private fun ProfileMenuItem(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String) {
+private fun ProfileInfoRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    value: String
+) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
         Spacer(modifier = Modifier.width(16.dp))
-        Text(label, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
-        Spacer(modifier = Modifier.weight(1f))
-        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column {
+            Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
+        }
     }
     HorizontalDivider()
 }

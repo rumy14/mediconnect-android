@@ -28,6 +28,16 @@ class MediConnectApi private constructor() {
                 instance ?: MediConnectApi().also { instance = it }
             }
         }
+
+        /** Convenience: restore token from SessionManager and return the instance. */
+        suspend fun init(context: android.content.Context): MediConnectApi {
+            val api = getInstance()
+            val token = com.mediconnect.data.session.SessionManager.getInstance(context).getToken()
+            if (!token.isNullOrBlank()) {
+                api.setToken(token)
+            }
+            return api
+        }
     }
 
     private val json = Json {

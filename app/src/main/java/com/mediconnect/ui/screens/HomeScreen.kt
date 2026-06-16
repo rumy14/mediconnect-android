@@ -1,6 +1,5 @@
 package com.mediconnect.ui.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,15 +15,34 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.mediconnect.data.api.MediConnectApi
+import com.mediconnect.data.model.Specialty
 import com.mediconnect.data.session.SessionManager
 import com.mediconnect.navigation.Screen
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(navController: NavController) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val session = remember { SessionManager.getInstance(context) }
+    val api = remember { MediConnectApi.getInstance() }
     val userName by session.userNameFlow.collectAsState(initial = null)
+
+    var specialties by remember { mutableStateOf<List<Specialty>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+
+    // Load specialties on first composition
+    LaunchedEffect(Unit) {
+        try {
+            val response = api.getSpecialties()
+            if (response.success) {
+                specialties = response.data
+            }
+        } catch (_: Exception) { /* silently fall back to empty */ }
+        loading = false
+    }
 
     Scaffold(
         topBar = {
@@ -87,14 +105,18 @@ fun HomeScreen(navController: NavController) {
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                         Spacer(modifier = Modifier.height(6.dp))
-                        Text("Book appointments with top doctors in your area.", fontSize = 14.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f))
+                        Text(
+                            "Book appointments with top doctors in your area.",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                        )
                     }
                 }
             }
 
             // Quick actions
             item {
-                Text("Quick Actions", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.padding(top = 8.dp))
+                Text("Quick Actions", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
             }
 
             item {
@@ -114,37 +136,49 @@ fun HomeScreen(navController: NavController) {
                 }
             }
 
-            // Browse specialties
+            // Browse by Specialty
             item {
-                Text("Browse by Specialty", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.padding(top = 8.dp))
+                Text("Browse by Specialty", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
             }
 
-            val specialties = listOf(
-                "🩺" to "General Medicine",
-                "❤️" to "Cardiology",
-                "🧴" to "Dermatology",
-                "👶" to "Pediatrics",
-                "🦴" to "Orthopedics",
-                "🧠" to "Neurology"
-            )
-
-            items(specialties) { (icon, name) ->
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { navController.navigate(Screen.Doctors.route) },
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(icon, fontSize = 24.sp)
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Text(name, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                        Spacer(modifier = Modifier.weight(1f))
-                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (loading) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
                     }
+                }
+            } else if (specialties.isEmpty()) {
+                // Fallback emoji mapping for common specialties
+                val fallback = listOf(
+                    "General Medicine" to "🩺",
+                    "Cardiology" to "❤️",
+                    "Dermatology" to "🧴",
+                    "Pediatrics" to "👶",
+                    "Orthopedics" to "🦴",
+                    "Neurology" to "🧠"
+                )
+                items(fallback) { (name, emoji) ->
+                    SpecialtyCard(emoji = emoji, name = name, onClick = {
+                        navController.navigate(Screen.Doctors.route)
+                    })
+                }
+            } else {
+                // Emoji mapping for specialty icons from API data
+                val emojiMap = mapOf(
+                    "general" to "🩺", "cardiology" to "❤️", "dermatology" to "🧴",
+                    "pediatrics" to "👶", "orthopedics" to "🦴", "neurology" to "🧠",
+                    "ophthalmology" to "👁️", "ent" to "👂", "dentistry" to "🦷",
+                    "psychiatry" to "🧠", "gynecology" to "♀️", "urology" to "🫁",
+                    "gastroenterology" to "🫃", "endocrinology" to "🩻"
+                )
+                items(specialties) { specialty ->
+                    val emoji = emojiMap.entries.firstOrNull { (k, _) ->
+                        specialty.name.contains(k, ignoreCase = true) ||
+                        k.contains(specialty.name, ignoreCase = true)
+                    }?.value ?: "🩺"
+                    SpecialtyCard(emoji = emoji, name = specialty.name, onClick = {
+                        navController.navigate(Screen.Doctors.route)
+                    })
                 }
             }
 
@@ -172,6 +206,27 @@ private fun QuickActionCard(
             Icon(icon, contentDescription = null, modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.height(8.dp))
             Text(label, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+        }
+    }
+}
+
+@Composable
+private fun SpecialtyCard(emoji: String, name: String, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(emoji, fontSize = 24.sp)
+            Spacer(modifier = Modifier.width(16.dp))
+            Text(name, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+            Spacer(modifier = Modifier.weight(1f))
+            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

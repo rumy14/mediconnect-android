@@ -1,16 +1,45 @@
 package com.mediconnect.navigation
 
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.mediconnect.data.api.MediConnectApi
+import com.mediconnect.data.session.SessionManager
 import com.mediconnect.ui.screens.*
+import kotlinx.coroutines.launch
 
 @Composable
 fun MediConnectNavGraph(navController: NavHostController) {
-    NavHost(navController = navController, startDestination = Screen.Login.route) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val api = remember { MediConnectApi.getInstance() }
+
+    var startDestination by remember { mutableStateOf<String?>(null) }
+
+    // Check auth state and restore token on startup
+    LaunchedEffect(Unit) {
+        try {
+            val session = SessionManager.getInstance(context)
+            val token = session.getToken()
+            if (!token.isNullOrBlank()) {
+                api.setToken(token)
+                startDestination = Screen.Home.route
+            } else {
+                startDestination = Screen.Login.route
+            }
+        } catch (_: Exception) {
+            startDestination = Screen.Login.route
+        }
+    }
+
+    // Wait until start destination is determined
+    val destination = startDestination ?: return
+
+    NavHost(navController = navController, startDestination = destination) {
 
         composable(Screen.Login.route) {
             LoginScreen(navController = navController)
@@ -58,11 +87,17 @@ fun MediConnectNavGraph(navController: NavHostController) {
                 navArgument("appointmentId") { type = NavType.StringType }
             )
         ) {
+            // Navigate to appointments screen with auto-scroll to detail
             AppointmentsScreen(navController = navController)
         }
 
         composable(Screen.Profile.route) {
             ProfileScreen(navController = navController)
+        }
+
+        // Separate route for sign-out redirect
+        composable("login") {
+            LoginScreen(navController = navController)
         }
     }
 }

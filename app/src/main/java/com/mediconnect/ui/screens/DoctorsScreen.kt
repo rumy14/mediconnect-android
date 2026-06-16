@@ -3,8 +3,10 @@ package com.mediconnect.ui.screens
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -14,11 +16,48 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.mediconnect.data.api.MediConnectApi
+import com.mediconnect.data.model.DoctorSummary
+import com.mediconnect.data.model.Specialty
 import com.mediconnect.navigation.Screen
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DoctorsScreen(navController: NavController) {
+    val scope = rememberCoroutineScope()
+    val api = remember { MediConnectApi.getInstance() }
+
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedSpecialty by remember { mutableStateOf<String?>(null) }
+    var specialties by remember { mutableStateOf<List<Specialty>>(emptyList()) }
+    var doctors by remember { mutableStateOf<List<DoctorSummary>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+
+    // Load specialties & doctors
+    LaunchedEffect(Unit) {
+        try {
+            val specsResp = api.getSpecialties()
+            if (specsResp.success) specialties = specsResp.data
+            val docsResp = api.getDoctors()
+            if (docsResp.success) doctors = docsResp.data
+        } catch (_: Exception) { /* fallback to empty */ }
+        loading = false
+    }
+
+    // Filter doctors locally
+    val filteredDoctors = remember(doctors, selectedSpecialty, searchQuery) {
+        doctors.filter { doc ->
+            val matchesSpecialty = selectedSpecialty == null ||
+                doc.specialties.any { it.specialty.name == selectedSpecialty }
+            val matchesSearch = searchQuery.isBlank() ||
+                doc.user.firstName.contains(searchQuery, ignoreCase = true) ||
+                doc.user.lastName.contains(searchQuery, ignoreCase = true) ||
+                doc.specialties.any { it.specialty.name.contains(searchQuery, ignoreCase = true) }
+            matchesSpecialty && matchesSearch
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -29,7 +68,7 @@ fun DoctorsScreen(navController: NavController) {
                 ),
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
@@ -42,8 +81,8 @@ fun DoctorsScreen(navController: NavController) {
             // Search bar
             item {
                 OutlinedTextField(
-                    value = "",
-                    onValueChange = {},
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
                     placeholder = { Text("Search by name or specialty...") },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                     singleLine = true,
@@ -52,52 +91,80 @@ fun DoctorsScreen(navController: NavController) {
                 )
             }
 
-            // Filter chips
+            // Specialty filter chips
             item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 4.dp)) {
-                    FilterChip(selected = true, onClick = {}, label = { Text("All") })
-                    FilterChip(selected = false, onClick = {}, label = { Text("Cardiology") })
-                    FilterChip(selected = false, onClick = {}, label = { Text("Dermatology") })
-                    FilterChip(selected = false, onClick = {}, label = { Text("Pediatrics") })
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 4.dp)) {
+                    item {
+                        FilterChip(
+                            selected = selectedSpecialty == null,
+                            onClick = { selectedSpecialty = null },
+                            label = { Text("All") }
+                        )
+                    }
+                    items(specialties) { spec ->
+                        FilterChip(
+                            selected = selectedSpecialty == spec.name,
+                            onClick = { selectedSpecialty = if (selectedSpecialty == spec.name) null else spec.name },
+                            label = { Text(spec.name) }
+                        )
+                    }
                 }
             }
 
-            // Doctor cards
-            val doctors = listOf(
-                Triple("Dr. Sarah Chen", "Cardiologist • 12 yrs", "\$150"),
-                Triple("Dr. Michael Patel", "General Medicine • 15 yrs", "\$75"),
-                Triple("Dr. Emma Williams", "Pediatrician • 8 yrs", "\$100"),
-                Triple("Dr. James Khan", "Dermatologist • 10 yrs", "\$125"),
-                Triple("Dr. Lisa Rodriguez", "Orthopedic Surgeon • 14 yrs", "\$175"),
-            )
+            if (loading) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                }
+            } else if (filteredDoctors.isEmpty()) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
+                        Text("No doctors found", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            } else {
+                items(filteredDoctors) { doctor ->
+                    val name = "Dr. ${doctor.user.firstName} ${doctor.user.lastName}"
+                    val specialtyNames = doctor.specialties.joinToString(" • ") { it.specialty.name }
+                    val ratingText = if (doctor.averageRating != null) "★ ${doctor.averageRating}" else null
 
-            items(doctors) { (name, specialty, fee) ->
-                Card(
-                    modifier = Modifier.fillMaxWidth().clickable { navController.navigate(Screen.DoctorDetail.createRoute("1")) },
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Card(
+                        modifier = Modifier.fillMaxWidth().clickable {
+                            navController.navigate(Screen.DoctorDetail.createRoute(doctor.id))
+                        },
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
                     ) {
-                        // Avatar placeholder
-                        Surface(
-                            modifier = Modifier.size(52.dp),
-                            shape = MaterialTheme.shapes.medium,
-                            color = MaterialTheme.colorScheme.primaryContainer
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
+                            // Avatar placeholder
+                            Surface(
+                                modifier = Modifier.size(52.dp),
+                                shape = MaterialTheme.shapes.medium,
+                                color = MaterialTheme.colorScheme.primaryContainer
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
+                                }
                             }
-                        }
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(name, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                            Text(specialty, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(fee, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.primary)
-                            Text("/ visit", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(name, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                                Text(specialtyNames, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                if (ratingText != null) {
+                                    Text(ratingText, fontSize = 12.sp, color = MaterialTheme.colorScheme.tertiary)
+                                }
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    "$${doctor.consultationFee.toInt()}",
+                                    fontWeight = FontWeight.Bold, fontSize = 16.sp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text("/ visit", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     }
                 }
