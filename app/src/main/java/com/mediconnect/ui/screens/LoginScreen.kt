@@ -289,36 +289,32 @@ fun LoginScreen(navController: NavController) {
                             Text("Register", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AccentTeal)
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    // AI Voice Assistant pill button
+                    OutlinedButton(
+                        onClick = { showAiVoice = true },
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = PillBg,
+                            contentColor = Color.White
+                        ),
+                        border = BorderStroke(1.dp, GoldenOutline)
+                    ) {
+                        Text(text = "🎤", fontSize = 16.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Talk to AI Assistant",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.weight(1f))
-
-            // AI Voice Assistant pill button
-            OutlinedButton(
-                onClick = { showAiVoice = true },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .padding(bottom = 16.dp),
-                shape = RoundedCornerShape(24.dp),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = PillBg,
-                    contentColor = Color.White
-                ),
-                border = BorderStroke(1.dp, GoldenOutline)
-            ) {
-                Text(
-                    text = "🎤",
-                    fontSize = 16.sp
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Talk to AI Assistant",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 
