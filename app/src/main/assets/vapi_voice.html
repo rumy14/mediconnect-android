@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Voice Assistant</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .status-bar {
+    position: absolute;
+    top: 16px;
+    left: 0; right: 0;
+    text-align: center;
+    font-size: 13px;
+    color: #94a3b8;
+    letter-spacing: 0.3px;
+  }
+
+  .mic-container {
+    width: 120px;
+    height: 120px;
+    border-radius: 60px;
+    background: linear-gradient(135deg, #1e293b, #334155);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 32px;
+    transition: all 0.3s ease;
+    border: 2px solid #475569;
+  }
+  .mic-container.active {
+    border-color: #22c55e;
+    box-shadow: 0 0 30px rgba(34, 197, 94, 0.3);
+    background: linear-gradient(135deg, #1a3a2a, #1e293b);
+  }
+  .mic-container.speaking {
+    border-color: #3b82f6;
+    box-shadow: 0 0 30px rgba(59, 130, 246, 0.3);
+    background: linear-gradient(135deg, #1e3a5f, #1e293b);
+  }
+  .mic-container.error {
+    border-color: #ef4444;
+    box-shadow: 0 0 30px rgba(239, 68, 68, 0.3);
+  }
+  .mic-icon {
+    font-size: 48px;
+    line-height: 1;
+    transition: all 0.3s ease;
+  }
+  .mic-container.listening .mic-icon {
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  .status-text {
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: 8px;
+    min-height: 24px;
+  }
+  .sub-status {
+    font-size: 13px;
+    color: #64748b;
+    text-align: center;
+    min-height: 18px;
+  }
+
+  .transcript-area {
+    width: 100%;
+    max-width: 400px;
+    max-height: 180px;
+    overflow-y: auto;
+    margin-top: 24px;
+    padding: 16px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 12px;
+    border: 1px solid #1e293b;
+    display: none;
+  }
+  .transcript-area.visible { display: block; }
+  .transcript-msg {
+    margin-bottom: 8px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .transcript-msg .label {
+    font-weight: 600;
+    opacity: 0.6;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .transcript-msg.user { text-align: right; }
+  .transcript-msg.user .text {
+    display: inline-block;
+    background: #1d4ed8;
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: 16px 16px 4px 16px;
+    max-width: 85%;
+  }
+  .transcript-msg.assistant .text {
+    display: inline-block;
+    background: #334155;
+    color: #e2e8f0;
+    padding: 8px 14px;
+    border-radius: 16px 16px 16px 4px;
+    max-width: 85%;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.08); }
+  }
+
+  .connecting-dots::after {
+    content: '';
+    animation: dots 1.5s steps(3, end) infinite;
+  }
+  @keyframes dots {
+    0% { content: ''; }
+    33% { content: '.'; }
+    66% { content: '..'; }
+    100% { content: '...'; }
+  }
+</style>
+</head>
+<body>
+  <div class="status-bar">🎙️ MediConnect AI</div>
+
+  <div class="mic-container" id="micContainer">
+    <div class="mic-icon" id="micIcon">🎤</div>
+  </div>
+
+  <div class="status-text" id="statusText">Connecting<span class="connecting-dots"></span></div>
+  <div class="sub-status" id="subStatus">Starting AI voice assistant...</div>
+
+  <div class="transcript-area" id="transcriptArea">
+    <div id="transcriptList"></div>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "@vapi-ai/web": "https://esm.sh/@vapi-ai/web@latest"
+    }
+  }
+  </script>
+  <script type="module">
+    import Vapi from '@vapi-ai/web';
+
+    const ASSISTANT_ID = '__ASSISTANT_ID__';
+    const PUBLIC_KEY  = '__PUBLIC_KEY__';
+
+    const micContainer = document.getElementById('micContainer');
+    const micIcon = document.getElementById('micIcon');
+    const statusText = document.getElementById('statusText');
+    const subStatus = document.getElementById('subStatus');
+    const transcriptArea = document.getElementById('transcriptArea');
+    const transcriptList = document.getElementById('transcriptList');
+
+    let vapi = null;
+    let currentCall = null;
+
+    function setStatus(state, primary, secondary) {
+      // Reset classes
+      micContainer.className = 'mic-container';
+      if (state === 'connecting') {
+        micContainer.classList.add('listening');
+        statusText.textContent = primary || 'Connecting...';
+        subStatus.textContent = secondary || '';
+      } else if (state === 'listening') {
+        micContainer.classList.add('active', 'listening');
+        statusText.textContent = primary || 'Listening...';
+        subStatus.textContent = secondary || 'You can speak now';
+      } else if (state === 'speaking') {
+        micContainer.classList.add('speaking');
+        statusText.textContent = primary || 'Assistant is speaking...';
+        subStatus.textContent = secondary || '';
+      } else if (state === 'error') {
+        micContainer.classList.add('error');
+        statusText.textContent = primary || 'Connection error';
+        subStatus.textContent = secondary || 'Please try again';
+      } else if (state === 'ended') {
+        statusText.textContent = primary || 'Call ended';
+        subStatus.textContent = secondary || 'You can close this window';
+      } else {
+        statusText.textContent = primary || '';
+        subStatus.textContent = secondary || '';
+      }
+    }
+
+    function addTranscript(role, text) {
+      transcriptArea.classList.add('visible');
+      const div = document.createElement('div');
+      div.className = `transcript-msg ${role}`;
+      div.innerHTML = `<div class="text">${text}</div>`;
+      transcriptList.appendChild(div);
+      transcriptArea.scrollTop = transcriptArea.scrollHeight;
+    }
+
+    function startCall() {
+      try {
+        vapi = new Vapi(PUBLIC_KEY);
+      } catch (e) {
+        setStatus('error', 'Failed to initialize', e.message);
+        return;
+      }
+
+      vapi.on('call-start', () => {
+        setStatus('listening', 'Connected', 'I\'m listening — go ahead!');
+      });
+
+      vapi.on('call-end', () => {
+        setStatus('ended', 'Call ended', 'You can close this window');
+        currentCall = null;
+      });
+
+      vapi.on('speech-start', () => {
+        setStatus('speaking', 'Assistant is speaking...', '');
+      });
+
+      vapi.on('speech-end', () => {
+        setStatus('listening', 'Listening...', 'Your turn to speak');
+      });
+
+      vapi.on('message', (msg) => {
+        if (msg.type === 'transcript' && msg.transcript) {
+          addTranscript(msg.role, msg.transcript);
+        }
+        if (msg.type === 'error') {
+          console.error('VAPI message error:', msg);
+        }
+      });
+
+      vapi.on('error', (e) => {
+        console.error('VAPI error:', e);
+        setStatus('error', 'Connection error', typeof e === 'string' ? e : e.message || 'Please try again');
+      });
+
+      setStatus('connecting', 'Connecting...', 'Establishing voice connection');
+
+      try {
+        vapi.start(ASSISTANT_ID);
+      } catch (e) {
+        setStatus('error', 'Failed to start', e.message);
+      }
+    }
+
+    function endCall() {
+      if (vapi) {
+        try { vapi.stop(); } catch(e) { /* ignore */ }
+      }
+      setStatus('ended', 'Call ended', 'You can close this window');
+    }
+
+    // Auto-start when page loads
+    startCall();
+
+    // Expose for Android bridge
+    window.VapiBridge = {
+      start: startCall,
+      end: endCall
+    };
+  </script>
+</body>
+</html>

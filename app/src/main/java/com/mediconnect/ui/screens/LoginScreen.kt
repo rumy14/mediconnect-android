@@ -11,7 +11,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -22,6 +21,7 @@ import com.mediconnect.navigation.Screen
 fun LoginScreen(navController: NavController) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var showAiVoice by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -94,5 +94,32 @@ fun LoginScreen(navController: NavController) {
         TextButton(onClick = { navController.navigate(Screen.Register.route) }) {
             Text("Don't have an account? Register")
         }
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        // AI Voice Assistant button
+        TextButton(
+            onClick = { showAiVoice = true },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp)
+        ) {
+            Text(
+                text = "🎤  ",
+                fontSize = 16.sp
+            )
+            Text(
+                text = "Talk to AI Assistant",
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Medium
+            )
+        }
     }
+
+    // AI Voice Call Dialog
+    VapiVoiceCallDialog(
+        show = showAiVoice,
+        onDismiss = { showAiVoice = false }
+    )
 }
