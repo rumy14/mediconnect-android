@@ -19,10 +19,8 @@
     display: flex;
     flex-direction: column;
     height: 100%;
-    padding: 0;
   }
 
-  /* Header */
   .header {
     display: flex;
     align-items: center;
@@ -63,11 +61,10 @@
     font-size: 16px;
     color: #fff;
     border: none;
-    transition: background 0.2s;
+    -webkit-tap-highlight-color: transparent;
   }
-  .header-close:active { background: rgba(255,255,255,0.2); }
+  .header-close:active { background: rgba(255,255,255,0.25); }
 
-  /* Center area - mic visualization */
   .mic-area {
     flex: 1;
     display: flex;
@@ -81,38 +78,36 @@
     width: 100px;
     height: 100px;
     border-radius: 50%;
-    background: #22c55e;
+    background: #475569;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 40px;
-    transition: all 0.3s ease;
-    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
-    position: relative;
+    transition: background 0.3s ease;
+    box-shadow: 0 0 0 0 rgba(0,0,0,0);
   }
-  .mic-circle.active {
+  .mic-circle.listening {
+    background: #22c55e;
     animation: pulse-glow 2s ease-in-out infinite;
   }
   .mic-circle.speaking {
     background: #3b82f6;
-    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
     animation: pulse-glow-blue 2s ease-in-out infinite;
   }
   .mic-circle.error {
     background: #ef4444;
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
     animation: pulse-glow-red 2s ease-in-out infinite;
   }
 
   @keyframes pulse-glow {
-    0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); transform: scale(1); }
-    50% { box-shadow: 0 0 30px 10px rgba(34, 197, 94, 0.2); transform: scale(1.03); }
-    100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); transform: scale(1); }
+    0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
+    50% { box-shadow: 0 0 30px 10px rgba(34, 197, 94, 0.2); }
+    100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
   }
   @keyframes pulse-glow-blue {
-    0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5); transform: scale(1); }
-    50% { box-shadow: 0 0 30px 10px rgba(59, 130, 246, 0.2); transform: scale(1.03); }
-    100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5); transform: scale(1); }
+    0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5); }
+    50% { box-shadow: 0 0 30px 10px rgba(59, 130, 246, 0.2); }
+    100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5); }
   }
   @keyframes pulse-glow-red {
     0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
@@ -126,15 +121,16 @@
     margin-top: 16px;
     color: #fff;
     min-height: 22px;
+    text-align: center;
   }
   .sub-status {
     font-size: 12px;
     color: rgba(255,255,255,0.4);
     margin-top: 4px;
     min-height: 16px;
+    text-align: center;
   }
 
-  /* Chat transcript */
   .chat-area {
     flex-shrink: 0;
     max-height: 200px;
@@ -144,50 +140,30 @@
     -webkit-overflow-scrolling: touch;
   }
   .chat-area.visible { display: block; }
-
   .chat-bubble {
     margin-bottom: 8px;
     max-width: 85%;
     padding: 10px 14px;
     border-radius: 16px;
     font-size: 14px;
-    line-height: 1.5;
+    line-height: 1.4;
     word-wrap: break-word;
   }
   .chat-bubble.user {
     background: #2563eb;
     color: #fff;
-    align-self: flex-end;
     margin-left: auto;
     border-bottom-right-radius: 4px;
   }
   .chat-bubble.assistant {
     background: #1e293b;
     color: #e2e8f0;
-    align-self: flex-start;
     margin-right: auto;
     border-bottom-left-radius: 4px;
-  }
-  .chat-area-inner {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-  }
-
-  .connecting-dots::after {
-    content: '';
-    animation: dots 1.5s steps(3, end) infinite;
-  }
-  @keyframes dots {
-    0% { content: ''; }
-    33% { content: '.'; }
-    66% { content: '..'; }
-    100% { content: '...'; }
   }
 </style>
 </head>
 <body>
-  <!-- Header -->
   <div class="header">
     <div class="header-left">
       <div class="header-mic-icon">🎤</div>
@@ -196,17 +172,13 @@
     <button class="header-close" id="closeBtn">✕</button>
   </div>
 
-  <!-- Mic visualization -->
   <div class="mic-area">
     <div class="mic-circle" id="micCircle">🎤</div>
-    <div class="status-text" id="statusText">Connecting<span class="connecting-dots"></span></div>
-    <div class="sub-status" id="subStatus">Starting AI voice assistant...</div>
+    <div class="status-text" id="statusText">Connecting...</div>
+    <div class="sub-status" id="subStatus">Starting AI voice assistant</div>
   </div>
 
-  <!-- Chat transcript -->
-  <div class="chat-area" id="chatArea">
-    <div class="chat-area-inner" id="chatList"></div>
-  </div>
+  <div class="chat-area" id="chatArea"></div>
 
   <script type="importmap">
   {
@@ -225,111 +197,124 @@
     const statusText = document.getElementById('statusText');
     const subStatus = document.getElementById('subStatus');
     const chatArea = document.getElementById('chatArea');
-    const chatList = document.getElementById('chatList');
     const closeBtn = document.getElementById('closeBtn');
 
     let vapi = null;
+    let connected = false;
 
-    function setStatus(state, primary, secondary) {
+    function setStatus(state, msg, sub) {
+      // Reset classes first
       micCircle.className = 'mic-circle';
-      if (state === 'connecting') {
-        micCircle.classList.add('active');
-        statusText.textContent = primary || 'Connecting...';
-        subStatus.textContent = secondary || '';
-      } else if (state === 'listening') {
-        micCircle.classList.add('active');
-        statusText.textContent = primary || 'Listening...';
-        subStatus.textContent = secondary || 'Speak now';
+
+      if (state === 'listening') {
+        micCircle.classList.add('listening');
       } else if (state === 'speaking') {
         micCircle.classList.add('speaking');
-        statusText.textContent = primary || 'Assistant is speaking...';
-        subStatus.textContent = secondary || '';
       } else if (state === 'error') {
         micCircle.classList.add('error');
-        statusText.textContent = primary || 'Connection error';
-        subStatus.textContent = secondary || 'Please try again';
-      } else {
-        statusText.textContent = primary || '';
-        subStatus.textContent = secondary || '';
       }
+
+      statusText.textContent = msg || '';
+      subStatus.textContent = sub || '';
     }
 
-    function addChatBubble(role, text) {
-      chatArea.classList.add('visible');
+    function addBubble(role, text) {
+      chatArea.style.display = 'block';
       const bubble = document.createElement('div');
-      bubble.className = `chat-bubble ${role}`;
+      bubble.className = 'chat-bubble ' + role;
       bubble.textContent = text;
-      chatList.appendChild(bubble);
+      chatArea.appendChild(bubble);
       chatArea.scrollTop = chatArea.scrollHeight;
     }
 
-    function startCall() {
+    function start() {
       try {
         vapi = new Vapi(PUBLIC_KEY);
       } catch (e) {
-        setStatus('error', 'Failed to initialize', e.message);
+        console.error('Vapi init failed:', e);
+        setStatus('error', 'Setup failed', e?.message || 'Please try again');
         return;
       }
 
+      // Connection established
       vapi.on('call-start', () => {
-        setStatus('listening', 'Connected', 'I\'m listening — go ahead!');
+        connected = true;
+        setStatus('listening', 'Connected', "I'm listening — go ahead!");
       });
 
+      // Call ended gracefully
       vapi.on('call-end', () => {
-        setStatus('listening', 'Call ended', 'You can close this window');
+        connected = false;
+        setStatus(null, 'Call ended', 'You can close this window');
       });
 
+      // AI is speaking
       vapi.on('speech-start', () => {
         setStatus('speaking', 'Assistant is speaking...', '');
       });
 
+      // AI finished, listening again
       vapi.on('speech-end', () => {
-        setStatus('listening', 'Listening...', 'Your turn to speak');
+        if (connected) {
+          setStatus('listening', 'Listening...', 'Your turn to speak');
+        }
       });
 
+      // Messages (transcripts, etc.)
       vapi.on('message', (msg) => {
-        if (msg.type === 'transcript' && msg.transcript) {
-          addChatBubble(msg.role, msg.transcript);
-        }
-        if (msg.type === 'error') {
-          console.error('VAPI error:', msg);
+        if (msg && msg.type === 'transcript' && msg.transcript && msg.transcriptType === 'final') {
+          const role = msg.role === 'assistant' ? 'assistant' : 'user';
+          addBubble(role, msg.transcript);
         }
       });
 
+      // Errors — only show if NOT connected yet (during setup errors)
       vapi.on('error', (e) => {
         console.error('VAPI error:', e);
-        setStatus('error', 'Connection error', typeof e === 'string' ? e : 'Please try again');
+        const errorMsg = (typeof e === 'string' ? e : e?.message) || 'Something went wrong';
+
+        if (!connected) {
+          // Failure during setup/connection
+          if (/microphone|permission|denied/i.test(errorMsg)) {
+            setStatus('error', 'Microphone access needed', 'Allow mic in your phone settings');
+          } else if (/network|fetch|timeout/i.test(errorMsg)) {
+            setStatus('error', 'Connection problem', 'Check your internet');
+          } else {
+            setStatus('error', 'Connection error', errorMsg.length < 60 ? errorMsg : 'Please try again');
+          }
+        } else {
+          // Connected but had an error mid-call — show briefly as red but keep UI alive
+          setStatus('speaking', 'Reconnecting...', 'Just a moment');
+          setTimeout(() => {
+            if (connected) setStatus('listening', 'Listening...', 'Your turn to speak');
+          }, 2000);
+        }
       });
 
-      setStatus('connecting', 'Connecting...', 'Establishing voice connection');
+      // Initial state
+      setStatus(null, 'Connecting...', 'Establishing voice connection');
 
       try {
         vapi.start(ASSISTANT_ID);
       } catch (e) {
-        setStatus('error', 'Failed to start', e.message);
+        console.error('Vapi start failed:', e);
+        setStatus('error', 'Failed to start', e?.message || 'Please try again');
       }
     }
 
-    function endCall() {
-      if (vapi) {
-        try { vapi.stop(); } catch(e) { /* ignore */ }
-      }
-      setStatus('listening', 'Call ended', 'You can close this window');
+    function end() {
+      try {
+        if (vapi) vapi.stop();
+      } catch (e) { /* ignore */ }
     }
 
-    // Auto-start when page loads
-    startCall();
+    closeBtn.addEventListener('click', end);
 
-    // Close button — notify Android via VapiBridge
-    closeBtn.addEventListener('click', () => {
-      endCall();
-    });
+    // Auto-start
+    start();
 
-    // Expose for Android bridge
-    window.VapiBridge = {
-      start: startCall,
-      end: endCall
-    };
+    // Bridge for Android
+    window.VapiBridge = { start, end };
   </script>
 </body>
 </html>
