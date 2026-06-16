@@ -3,6 +3,7 @@ package com.mediconnect.ui.screens
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.os.Build
 import android.view.ViewGroup
 import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
@@ -157,9 +158,17 @@ private fun VapiVoiceCallWebView(
 ) {
     val context = LocalContext.current
     var isLoading by remember { mutableStateOf(true) }
-    var isConnected by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var webView by remember { mutableStateOf<WebView?>(null) }
+
+    // Auto-dismiss error after 20s timeout if nothing connected
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(20_000)
+        if (isLoading && errorMessage == null) {
+            errorMessage = "Connection timed out. Please try again."
+            isLoading = false
+        }
+    }
 
     // Load the HTML content with key/assistant injected
     val htmlContent = remember {
@@ -210,8 +219,16 @@ private fun VapiVoiceCallWebView(
                             request: WebResourceRequest?,
                             error: WebResourceError?
                         ) {
-                            errorMessage = "Failed to load voice interface"
-                            isLoading = false
+                            // Only show error for MAIN page failure, not sub-resources (fonts, icons, etc.)
+                            if (request?.isForMainFrame == true) {
+                                val desc = if (Build.VERSION.SDK_INT >= 23) {
+                                    error?.description?.toString() ?: "Unknown"
+                                } else {
+                                    "Error"
+                                }
+                                errorMessage = "Failed to load voice interface ($desc)"
+                                isLoading = false
+                            }
                         }
                     }
 
