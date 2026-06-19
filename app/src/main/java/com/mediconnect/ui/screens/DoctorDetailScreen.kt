@@ -30,8 +30,8 @@ fun DoctorDetailScreen(navController: NavController) {
 
     var doctor by remember { mutableStateOf<DoctorDetail?>(null) }
     var slots by remember { mutableStateOf<List<TimeSlot>>(emptyList()) }
-    var selectedDate by remember { mutableStateOf(LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)) }
-    var displayDate by remember { mutableStateOf("Today") }
+    var selectedDate by remember { mutableStateOf(LocalDate.now().plusDays(1).format(DateTimeFormatter.ISO_LOCAL_DATE)) }
+    var displayDate by remember { mutableStateOf("Tomorrow") }
     var loading by remember { mutableStateOf(true) }
     var slotsLoading by remember { mutableStateOf(false) }
 
@@ -58,11 +58,10 @@ fun DoctorDetailScreen(navController: NavController) {
 
     // Format display date
     LaunchedEffect(selectedDate) {
-        val today = LocalDate.now()
         val date = try { LocalDate.parse(selectedDate) } catch (_: Exception) { null }
         displayDate = when {
-            date == today -> "Today"
-            date == today.plusDays(1) -> "Tomorrow"
+            date == LocalDate.now() -> "Today"
+            date == LocalDate.now().plusDays(1) -> "Tomorrow"
             date != null -> date.format(DateTimeFormatter.ofPattern("MMM d"))
             else -> selectedDate
         }
@@ -142,33 +141,12 @@ fun DoctorDetailScreen(navController: NavController) {
             HorizontalDivider()
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Available slots with date navigation
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = {
-                        val date = try { LocalDate.parse(selectedDate) } catch (_: Exception) { return@IconButton }
-                        selectedDate = date.minusDays(1).format(DateTimeFormatter.ISO_LOCAL_DATE)
-                    }
-                ) {
-                    Icon(Icons.Default.ChevronLeft, contentDescription = "Previous day")
-                }
-                Text(
-                    "Available Slots — $displayDate",
-                    fontSize = 16.sp, fontWeight = FontWeight.SemiBold
-                )
-                IconButton(
-                    onClick = {
-                        val date = try { LocalDate.parse(selectedDate) } catch (_: Exception) { return@IconButton }
-                        selectedDate = date.plusDays(1).format(DateTimeFormatter.ISO_LOCAL_DATE)
-                    }
-                ) {
-                    Icon(Icons.Default.ChevronRight, contentDescription = "Next day")
-                }
-            }
+            // Available slots
+            Text(
+                "Available Slots — $displayDate",
+                fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.align(Alignment.Start)
+            )
             Spacer(modifier = Modifier.height(12.dp))
 
             if (slotsLoading) {
