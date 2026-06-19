@@ -43,11 +43,12 @@ class MediConnectApi private constructor() {
     private val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
-        encodeDefaults = true
+        encodeDefaults = false
         prettyPrint = false
     }
 
     private val client = HttpClient {
+        expectSuccess = false
         install(ContentNegotiation) {
             json(json)
         }

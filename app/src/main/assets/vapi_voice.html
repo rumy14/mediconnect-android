@@ -19,70 +19,28 @@
     display: flex;
     flex-direction: column;
     height: 100%;
+    padding-top: 72px; /* room for the Android-side top bar */
   }
-
-  .header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 16px 20px;
-    padding-top: 24px;
-    flex-shrink: 0;
-  }
-  .header-left {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .header-mic-icon {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: #22c55e;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-  }
-  .header-title {
-    font-size: 16px;
-    font-weight: 600;
-    color: #fff;
-  }
-  .header-close {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.1);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 16px;
-    color: #fff;
-    border: none;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .header-close:active { background: rgba(255,255,255,0.25); }
 
   .mic-area {
-    flex: 1;
+    flex: 1 1 auto;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     min-height: 0;
+    padding: 24px 20px 12px;
   }
 
   .mic-circle {
-    width: 100px;
-    height: 100px;
+    width: 110px;
+    height: 110px;
     border-radius: 50%;
     background: #475569;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 40px;
+    font-size: 44px;
     transition: background 0.3s ease;
     box-shadow: 0 0 0 0 rgba(0,0,0,0);
   }
@@ -97,6 +55,10 @@
   .mic-circle.error {
     background: #ef4444;
     animation: pulse-glow-red 2s ease-in-out infinite;
+  }
+  .mic-circle.thinking {
+    background: #a855f7;
+    animation: pulse-glow-purple 1.2s ease-in-out infinite;
   }
 
   @keyframes pulse-glow {
@@ -114,71 +76,107 @@
     50% { box-shadow: 0 0 30px 10px rgba(239, 68, 68, 0.2); }
     100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
   }
+  @keyframes pulse-glow-purple {
+    0% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.5); }
+    50% { box-shadow: 0 0 30px 10px rgba(168, 85, 247, 0.2); }
+    100% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.5); }
+  }
 
   .status-text {
-    font-size: 16px;
-    font-weight: 500;
-    margin-top: 16px;
+    font-size: 17px;
+    font-weight: 600;
+    margin-top: 20px;
     color: #fff;
-    min-height: 22px;
+    min-height: 24px;
     text-align: center;
   }
   .sub-status {
-    font-size: 12px;
-    color: rgba(255,255,255,0.4);
-    margin-top: 4px;
-    min-height: 16px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.45);
+    margin-top: 6px;
+    min-height: 18px;
     text-align: center;
   }
 
-  .chat-area {
-    flex-shrink: 0;
-    max-height: 200px;
-    overflow-y: auto;
-    padding: 0 20px 16px;
-    display: none;
-    -webkit-overflow-scrolling: touch;
-  }
-  .chat-area.visible { display: block; }
-  .chat-bubble {
-    margin-bottom: 8px;
-    max-width: 85%;
-    padding: 10px 14px;
+  /* Voice-to-text transcript window — always present, scrollable, responsive */
+  .transcript-window {
+    flex: 0 0 auto;
+    height: 40vh;
+    min-height: 180px;
+    max-height: 50vh;
+    margin: 8px 16px 24px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 16px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 14px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .transcript-window::-webkit-scrollbar { width: 6px; }
+  .transcript-window::-webkit-scrollbar-track { background: transparent; }
+  .transcript-window::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+
+  .transcript-empty {
+    color: rgba(255,255,255,0.35);
+    font-size: 13px;
+    text-align: center;
+    margin: auto 0;
+  }
+
+  .chat-bubble {
+    max-width: 88%;
+    padding: 10px 14px;
+    border-radius: 18px;
     font-size: 14px;
     line-height: 1.4;
     word-wrap: break-word;
+    animation: bubble-in 0.25s ease-out;
   }
+  @keyframes bubble-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
   .chat-bubble.user {
-    background: #2563eb;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
     color: #fff;
     margin-left: auto;
-    border-bottom-right-radius: 4px;
+    border-bottom-right-radius: 6px;
   }
   .chat-bubble.assistant {
-    background: #1e293b;
-    color: #e2e8f0;
+    background: rgba(255,255,255,0.08);
+    color: #f1f5f9;
     margin-right: auto;
-    border-bottom-left-radius: 4px;
+    border-bottom-left-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .live-interim {
+    align-self: flex-start;
+    max-width: 88%;
+    padding: 8px 12px;
+    border-radius: 14px;
+    background: rgba(34,197,94,0.10);
+    border: 1px dashed rgba(34,197,94,0.30);
+    color: rgba(255,255,255,0.55);
+    font-size: 13px;
+    font-style: italic;
   }
 </style>
 </head>
 <body>
-  <div class="header">
-    <div class="header-left">
-      <div class="header-mic-icon">🎤</div>
-      <span class="header-title">MediConnect AI</span>
-    </div>
-    <button class="header-close" id="closeBtn">✕</button>
-  </div>
-
   <div class="mic-area">
     <div class="mic-circle" id="micCircle">🎤</div>
     <div class="status-text" id="statusText">Connecting...</div>
     <div class="sub-status" id="subStatus">Starting AI voice assistant</div>
   </div>
 
-  <div class="chat-area" id="chatArea"></div>
+  <div class="transcript-window" id="transcriptWindow" aria-live="polite">
+    <div class="transcript-empty" id="transcriptEmpty">Conversation will appear here</div>
+  </div>
 
   <script type="importmap">
   {
@@ -191,16 +189,21 @@
     import Vapi from '@vapi-ai/web';
 
     const ASSISTANT_ID = '__ASSISTANT_ID__';
-    const PUBLIC_KEY  = '***';
+    const PUBLIC_KEY  = '__PUBLIC_KEY__';
+    // Filled by Android before .start(). Carried into Vapi's call metadata so
+    // the server-side webhook (bookAppointment, etc.) can resolve the user.
+    const USER_JWT = '__USER_JWT__';
+    const USER_NAME = '__USER_NAME__';
 
     const micCircle = document.getElementById('micCircle');
     const statusText = document.getElementById('statusText');
     const subStatus = document.getElementById('subStatus');
-    const chatArea = document.getElementById('chatArea');
-    const closeBtn = document.getElementById('closeBtn');
+    const transcriptWindow = document.getElementById('transcriptWindow');
+    const transcriptEmpty = document.getElementById('transcriptEmpty');
 
     let vapi = null;
     let connected = false;
+    let interimEl = null;
 
     function setStatus(state, msg, sub) {
       // Reset classes first
@@ -212,19 +215,46 @@
         micCircle.classList.add('speaking');
       } else if (state === 'error') {
         micCircle.classList.add('error');
+      } else if (state === 'thinking') {
+        micCircle.classList.add('thinking');
       }
 
       statusText.textContent = msg || '';
       subStatus.textContent = sub || '';
     }
 
+    function clearInterim() {
+      if (interimEl && interimEl.parentNode) {
+        interimEl.parentNode.removeChild(interimEl);
+      }
+      interimEl = null;
+    }
+
     function addBubble(role, text) {
-      chatArea.style.display = 'block';
+      clearInterim();
+      if (transcriptEmpty && transcriptEmpty.parentNode) {
+        transcriptEmpty.parentNode.removeChild(transcriptEmpty);
+      }
       const bubble = document.createElement('div');
       bubble.className = 'chat-bubble ' + role;
       bubble.textContent = text;
-      chatArea.appendChild(bubble);
-      chatArea.scrollTop = chatArea.scrollHeight;
+      transcriptWindow.appendChild(bubble);
+      transcriptWindow.scrollTop = transcriptWindow.scrollHeight;
+    }
+
+    function showInterim(text) {
+      if (!text || !text.trim()) {
+        clearInterim();
+        return;
+      }
+      if (!interimEl) {
+        clearInterim();
+        interimEl = document.createElement('div');
+        interimEl.className = 'live-interim';
+        transcriptWindow.appendChild(interimEl);
+      }
+      interimEl.textContent = text;
+      transcriptWindow.scrollTop = transcriptWindow.scrollHeight;
     }
 
     function start() {
@@ -245,7 +275,10 @@
       // Call ended gracefully
       vapi.on('call-end', () => {
         connected = false;
+        clearInterim();
         setStatus(null, 'Call ended', 'You can close this window');
+        // Notify Android side so it can run the closing transition.
+        try { window.VapiBridge?.onRemoteEnd?.(); } catch (e) {}
       });
 
       // AI is speaking
@@ -260,13 +293,18 @@
         }
       });
 
-      // Messages (transcripts, etc.)
+      // Messages (final transcripts go permanent; partials show as a live interim line)
       vapi.on('message', (msg) => {
-        if (msg && msg.type === 'transcript' && msg.transcript && msg.transcriptType === 'final') {
+        if (msg && msg.type === 'transcript' && msg.transcript) {
           const role = msg.role === 'assistant' ? 'assistant' : 'user';
-          addBubble(role, msg.transcript);
+          if (msg.transcriptType === 'final') {
+            addBubble(role, msg.transcript);
+          } else if (msg.transcriptType === 'partial' && role === 'user') {
+            // Surface live user speech so the window feels responsive
+            showInterim(msg.transcript);
+          }
         }
-      });
+    });
 
       // Errors — only show if NOT connected yet (during setup errors)
       vapi.on('error', (e) => {
@@ -294,8 +332,15 @@
       // Initial state
       setStatus(null, 'Connecting...', 'Establishing voice connection');
 
+      // Build call metadata so the backend knows which user owns this call.
+      // The metadata travels with every server-tool webhook VAPI fires.
+      const metadata = {};
+      if (USER_JWT) metadata.jwt = USER_JWT;
+      if (USER_NAME) metadata.userName = USER_NAME;
+      metadata.source = 'mediconnect-android';
+
       try {
-        vapi.start(ASSISTANT_ID);
+        vapi.start(ASSISTANT_ID, { metadata });
       } catch (e) {
         console.error('Vapi start failed:', e);
         setStatus('error', 'Failed to start', e?.message || 'Please try again');
@@ -308,13 +353,18 @@
       } catch (e) { /* ignore */ }
     }
 
-    closeBtn.addEventListener('click', end);
-
     // Auto-start
     start();
 
     // Bridge for Android
-    window.VapiBridge = { start, end };
+    window.VapiBridge = {
+      start,
+      end,
+      setAuth(jwt, userName) {
+        USER_JWT = jwt || '';
+        USER_NAME = userName || '';
+      },
+    };
   </script>
 </body>
 </html>

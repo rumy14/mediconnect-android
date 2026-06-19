@@ -51,7 +51,7 @@ fun DoctorDetailScreen(navController: NavController) {
         slotsLoading = true
         try {
             val resp = api.getDoctorSlots(doctorId, selectedDate)
-            if (resp.success) slots = resp.data
+            if (resp.success) slots = resp.data ?: emptyList()
         } catch (_: Exception) { }
         slotsLoading = false
     }
@@ -184,16 +184,27 @@ fun DoctorDetailScreen(navController: NavController) {
             Spacer(modifier = Modifier.weight(1f))
 
             if (doc != null) {
-                Button(
-                    onClick = {
-                        navController.navigate(
-                            Screen.Booking.createRoute(doctorId, selectedDate, "now")
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    shape = MaterialTheme.shapes.medium
-                ) {
-                    Text("Book Appointment", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = {
+                            navController.navigate(
+                                Screen.Booking.createRoute(doctorId, selectedDate, "now")
+                            )
+                        },
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        shape = MaterialTheme.shapes.medium
+                    ) {
+                        Text("Book Online", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    }
+                    Button(
+                        onClick = { /* VAPI call trigger - handled by parent */ },
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        shape = MaterialTheme.shapes.medium
+                    ) {
+                        Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Call to Book", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    }
                 }
             }
         }

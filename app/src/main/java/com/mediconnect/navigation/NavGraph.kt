@@ -53,8 +53,21 @@ fun MediConnectNavGraph(navController: NavHostController) {
             HomeScreen(navController = navController)
         }
 
-        composable(Screen.Doctors.route) {
-            DoctorsScreen(navController = navController)
+        composable(
+            route = Screen.Doctors.route,
+            arguments = listOf(
+                navArgument("specialty") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val preselectedSpecialty = backStackEntry.arguments?.getString("specialty")
+            DoctorsScreen(
+                navController = navController,
+                preselectedSpecialty = preselectedSpecialty
+            )
         }
 
         composable(

@@ -13,8 +13,8 @@ android {
         applicationId = "com.mediconnect"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 3
+        versionName = "1.0.1"
 
         // ✅ Live API server
         buildConfigField("String", "API_BASE_URL", "\"https://mediconnect.nma-it.com/api/\"")
@@ -22,9 +22,19 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("../mediconnect-v2.jks")
+            storePassword = "mediconnect2026"
+            keyAlias = "mediconnect"
+            keyPassword = "mediconnect2026"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

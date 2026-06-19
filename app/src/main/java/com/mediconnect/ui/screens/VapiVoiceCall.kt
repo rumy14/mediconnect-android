@@ -3,7 +3,9 @@ package com.mediconnect.ui.screens
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.media.AudioManager
 import android.os.Build
+import android.view.KeyEvent
 import android.view.ViewGroup
 import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
@@ -14,19 +16,22 @@ import android.webkit.WebViewClient
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -34,6 +39,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import java.io.InputStream
 
 /**
@@ -56,7 +63,6 @@ fun VapiVoiceCallDialog(
     if (!show) return
 
     val context = LocalContext.current
-    val activity = context as? androidx.activity.ComponentActivity
 
     // —— Permission state ——
     var hasMicPermission by remember {
@@ -79,16 +85,46 @@ fun VapiVoiceCallDialog(
         }
     }
 
+    // —— Audio manager (used for volume + loudspeaker) ——
+    val audioManager = remember {
+        context.getSystemService(android.content.Context.AUDIO_SERVICE) as? AudioManager
+    }
+
+    // Volume button handler for the entire dialog surface.
+    val handleVolumeKey: (androidx.compose.ui.input.key.KeyEvent) -> Boolean = volKey@ { ke ->
+        if (ke.nativeKeyEvent.action != KeyEvent.ACTION_DOWN) return@volKey false
+        when (ke.nativeKeyEvent.keyCode) {
+            KeyEvent.KEYCODE_VOLUME_UP -> {
+                audioManager?.adjustStreamVolume(
+                    AudioManager.STREAM_MUSIC,
+                    AudioManager.ADJUST_RAISE,
+                    AudioManager.FLAG_SHOW_UI
+                )
+                true
+            }
+            KeyEvent.KEYCODE_VOLUME_DOWN -> {
+                audioManager?.adjustStreamVolume(
+                    AudioManager.STREAM_MUSIC,
+                    AudioManager.ADJUST_LOWER,
+                    AudioManager.FLAG_SHOW_UI
+                )
+                true
+            }
+            else -> false
+        }
+    }
+
     // —— UI ——
     AnimatedVisibility(
         visible = show,
-        enter = fadeIn(),
-        exit = fadeOut()
+        enter = fadeIn(animationSpec = tween(durationMillis = 250)),
+        exit = fadeOut(animationSpec = tween(durationMillis = 400))
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.92f))
+                .background(Color(0xFF050608))
+                .onPreviewKeyEvent { handleVolumeKey(it) }
         ) {
             if (!hasMicPermission) {
                 // Permission not granted — show prompt
@@ -97,8 +133,8 @@ fun VapiVoiceCallDialog(
                     onDismiss = onDismiss
                 )
             } else {
-                // Voice call WebView
-                VapiVoiceCallWebView(
+                // Voice call WebView with smooth end transition
+                VapiVoiceCallSurface(
                     onDismiss = onDismiss
                 )
             }
@@ -122,14 +158,11 @@ private fun PermissionPrompt(
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "🎤",
-            fontSize = 56.sp
-        )
-        Spacer(modifier = Modifier.height(20.dp))
-        Text(
             text = "Microphone Access Needed",
             style = MaterialTheme.typography.headlineSmall,
-            color = Color.White
+            color = Color.White,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(12.dp))
         Text(
@@ -150,34 +183,202 @@ private fun PermissionPrompt(
 }
 
 /**
- * The actual WebView that loads the VAPI voice call HTML.
+ * Voice call surface — owns the WebView and the closing transition.
+ *
+ * Lifecycle:
+ *   1. WebView mounts and starts the VAPI call.
+ *   2. When the close button is tapped (or call ends), we signal VAPI to stop
+ *      and reveal an "end-of-call" overlay.
+ *   3. After ~1.4s the overlay fades in, then onDismiss() runs.
  */
 @Composable
-private fun VapiVoiceCallWebView(
+private fun VapiVoiceCallSurface(
     onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val audioManager = remember {
+        context.getSystemService(android.content.Context.AUDIO_SERVICE) as? AudioManager
+    }
+    var webView by remember { mutableStateOf<WebView?>(null) }
+
+    // Pull the JWT and name from local session storage so VAPI tool calls can resolve the user.
+    var userJwt by remember { mutableStateOf("") }
+    var userName by remember { mutableStateOf("") }
+    LaunchedEffect(Unit) {
+        try {
+            val session = com.mediconnect.data.session.SessionManager.getInstance(context)
+            userJwt = session.getToken().orEmpty()
+            userName = session.userNameFlow.first().orEmpty()
+        } catch (_: Exception) { /* anonymous call (rare) */ }
+    }
+
+    // The closing overlay state
+    var endMessage by remember { mutableStateOf<String?>(null) }
+    // When user wants to close, set endMessage; after a moment, call onDismiss.
+    LaunchedEffect(endMessage) {
+        if (endMessage != null) {
+            delay(1400)
+            onDismiss()
+        }
+    }
+
+    // —— Force loudspeaker (speakerphone) so the AI voice plays out loud, not the earpiece ——
+    LaunchedEffect(Unit) {
+        audioManager?.let { am ->
+            // Make media stream drive the volume for both incoming audio and our UI.
+            am.mode = AudioManager.MODE_IN_COMMUNICATION
+            am.isSpeakerphoneOn = true
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            audioManager?.let { am ->
+                am.isSpeakerphoneOn = false
+                am.mode = AudioManager.MODE_NORMAL
+            }
+        }
+    }
+
+    val handleClose: () -> Unit = {
+        // Stop the VAPI call cleanly, then run the closing transition.
+        webView?.evaluateJavascript("window.VapiBridge?.end();", null)
+        endMessage = "Call ended"
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        // —— WebView (always present underneath) ——
+        VoiceCallWebView(
+            audioManager = audioManager,
+            userJwt = userJwt,
+            userName = userName,
+            onWebViewReady = { webView = it },
+            onCallEndedExternally = {
+                endMessage = "Call ended"
+            }
+        )
+
+        // —— Closing overlay with smooth fade ——
+        AnimatedVisibility(
+            visible = endMessage != null,
+            enter = fadeIn(animationSpec = tween(durationMillis = 350)),
+            exit = fadeOut(animationSpec = tween(durationMillis = 200)),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF050608)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.7f),
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = endMessage ?: "",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Closing…",
+                        color = Color.White.copy(alpha = 0.5f),
+                        fontSize = 13.sp
+                    )
+                }
+            }
+        }
+
+        // —— Top bar: title + a clean, large close icon ——
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 16.dp, top = 24.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF22C55E))
+                        .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("🎤", fontSize = 16.sp)
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    "MediConnect AI",
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 16.sp
+                )
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            // Clear, prominent close button — circular surface, proper Close icon.
+            Surface(
+                onClick = handleClose,
+                shape = CircleShape,
+                color = Color.White.copy(alpha = 0.14f),
+                contentColor = Color.White,
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
+                modifier = Modifier.size(44.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = "End call",
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The WebView that loads vapi_voice.html.
+ *
+ * - Reports the WebView upward so the parent can call end() on close.
+ * - Reports when the server-side call ends so we can show the closing overlay.
+ */
+@Composable
+private fun VoiceCallWebView(
+    audioManager: AudioManager?,
+    userJwt: String,
+    userName: String,
+    onWebViewReady: (WebView) -> Unit,
+    onCallEndedExternally: () -> Unit
 ) {
     val context = LocalContext.current
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var webView by remember { mutableStateOf<WebView?>(null) }
 
     // Auto-dismiss error after 20s timeout if nothing connected
     LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(20_000)
+        delay(20_000)
         if (isLoading && errorMessage == null) {
             errorMessage = "Connection timed out. Please try again."
             isLoading = false
         }
     }
 
-    // Load the HTML content with key/assistant injected
-    val htmlContent = remember {
+    // Load the HTML content with key/assistant/user injected
+    val htmlContent = remember(userJwt, userName) {
         try {
             val inputStream: InputStream = context.assets.open("vapi_voice.html")
             val text = inputStream.bufferedReader().use { it.readText() }
             text
                 .replace("__PUBLIC_KEY__", VapiConfig.PUBLIC_KEY)
                 .replace("__ASSISTANT_ID__", VapiConfig.ASSISTANT_ID)
+                .replace("__USER_JWT__", userJwt.escapeJsString())
+                .replace("__USER_NAME__", userName.escapeJsString())
         } catch (e: Exception) {
             null
         }
@@ -249,7 +450,7 @@ private fun VapiVoiceCallWebView(
                         loadUrl("about:blank")
                     }
 
-                    webView = this
+                    onWebViewReady(this)
                 }
             },
             modifier = Modifier.fillMaxSize(),
@@ -297,31 +498,17 @@ private fun VapiVoiceCallWebView(
                 }
             }
         }
-
-        // —— Close button (top-right) ——
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            contentAlignment = Alignment.TopEnd
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.15f))
-                    .clickable {
-                        // End the VAPI call before closing
-                        webView?.evaluateJavascript(
-                            "window.VapiBridge?.end();",
-                            null
-                        )
-                        onDismiss()
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                Text("✕", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            }
-        }
     }
 }
+
+/**
+ * Escape a string so it can safely be inlined inside a JS string literal.
+ * Backslashes, quotes and newlines are sanitised so an attacker-controlled
+ * user name can't break out of the literal.
+ */
+private fun String.escapeJsString(): String =
+    this.replace("\\", "\\\\")
+        .replace("'", "\\'")
+        .replace("\n", " ")
+        .replace("\r", " ")
+        .replace("</", "<\\/")

@@ -24,12 +24,15 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DoctorsScreen(navController: NavController) {
+fun DoctorsScreen(
+    navController: NavController,
+    preselectedSpecialty: String? = null
+) {
     val scope = rememberCoroutineScope()
     val api = remember { MediConnectApi.getInstance() }
 
     var searchQuery by remember { mutableStateOf("") }
-    var selectedSpecialty by remember { mutableStateOf<String?>(null) }
+    var selectedSpecialty by remember { mutableStateOf<String?>(preselectedSpecialty) }
     var specialties by remember { mutableStateOf<List<Specialty>>(emptyList()) }
     var doctors by remember { mutableStateOf<List<DoctorSummary>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
@@ -38,9 +41,9 @@ fun DoctorsScreen(navController: NavController) {
     LaunchedEffect(Unit) {
         try {
             val specsResp = api.getSpecialties()
-            if (specsResp.success) specialties = specsResp.data
+            if (specsResp.success) specialties = specsResp.data ?: emptyList()
             val docsResp = api.getDoctors()
-            if (docsResp.success) doctors = docsResp.data
+            if (docsResp.success) doctors = docsResp.data ?: emptyList()
         } catch (_: Exception) { /* fallback to empty */ }
         loading = false
     }

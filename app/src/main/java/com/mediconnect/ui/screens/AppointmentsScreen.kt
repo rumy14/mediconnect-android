@@ -30,6 +30,8 @@ fun AppointmentsScreen(navController: NavController) {
     var appointments by remember { mutableStateOf<List<AppointmentSummary>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var selectedFilter by remember { mutableStateOf<String?>(null) } // null = Upcoming, "cancelled", etc.
+    var cancelTarget by remember { mutableStateOf<AppointmentSummary?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     // Load appointments
     fun loadAppointments(status: String? = null) {
@@ -45,33 +47,36 @@ fun AppointmentsScreen(navController: NavController) {
 
     LaunchedEffect(Unit) { loadAppointments("all") }
 
-    // Filter locally
+    // Filter locally — API returns uppercase statuses (PENDING, CONFIRMED, COMPLETED, CANCELLED, NO_SHOW)
     val filteredAppointments = remember(appointments, selectedFilter) {
+        val upcoming = listOf("PENDING", "CONFIRMED", "SCHEDULED")
         when (selectedFilter) {
-            null -> appointments.filter { it.status == "scheduled" || it.status == "confirmed" }
-            "past" -> appointments.filter { it.status == "completed" }
-            "cancelled" -> appointments.filter { it.status == "cancelled" }
+            null -> appointments.filter { it.status.uppercase() in upcoming }
+            "past" -> appointments.filter { it.status.uppercase() == "COMPLETED" }
+            "cancelled" -> appointments.filter { it.status.uppercase() == "CANCELLED" }
             else -> appointments
         }
     }
 
     // Status helpers
-    fun statusLabel(status: String): String = when (status) {
-        "scheduled", "confirmed" -> "Upcoming"
-        "completed" -> "Completed"
-        "cancelled" -> "Cancelled"
+    fun statusLabel(status: String): String = when (status.uppercase()) {
+        "PENDING", "CONFIRMED", "SCHEDULED" -> "Upcoming"
+        "COMPLETED" -> "Completed"
+        "CANCELLED" -> "Cancelled"
+        "NO_SHOW" -> "No Show"
         else -> status.replaceFirstChar { it.uppercase() }
     }
 
     @Composable
-    fun statusColor(status: String): androidx.compose.ui.graphics.Color = when (status) {
-        "scheduled", "confirmed" -> MaterialTheme.colorScheme.primary
-        "completed" -> MaterialTheme.colorScheme.tertiary
-        "cancelled" -> MaterialTheme.colorScheme.error
+    fun statusColor(status: String): androidx.compose.ui.graphics.Color = when (status.uppercase()) {
+        "PENDING", "CONFIRMED", "SCHEDULED" -> MaterialTheme.colorScheme.primary
+        "COMPLETED" -> MaterialTheme.colorScheme.tertiary
+        "CANCELLED", "NO_SHOW" -> MaterialTheme.colorScheme.error
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("My Appointments", fontWeight = FontWeight.Bold) },
@@ -140,22 +145,8 @@ fun AppointmentsScreen(navController: NavController) {
                                 Text(dateTime, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 4.dp))
                             }
                             // Cancel button for upcoming
-                            if (appointment.status == "scheduled" || appointment.status == "confirmed") {
-                                IconButton(
-                                    onClick = {
-                                        scope.launch {
-                                            try {
-                                                val resp = api.cancelAppointment(appointment.id, "Cancelled by patient")
-                                                if (resp.success) {
-                                                    Toast.makeText(context, "Appointment cancelled", Toast.LENGTH_SHORT).show()
-                                                    loadAppointments()
-                                                }
-                                            } catch (_: Exception) {
-                                                Toast.makeText(context, "Failed to cancel", Toast.LENGTH_SHORT).show()
-                                            }
-                                        }
-                                    }
-                                ) {
+                            if (appointment.status.uppercase() in listOf("PENDING", "CONFIRMED", "SCHEDULED")) {
+                                IconButton(onClick = { cancelTarget = appointment }) {
                                     Icon(Icons.Default.Close, contentDescription = "Cancel", tint = MaterialTheme.colorScheme.error)
                                 }
                             } else {
@@ -172,5 +163,43 @@ fun AppointmentsScreen(navController: NavController) {
 
             item { Spacer(modifier = Modifier.height(16.dp)) }
         }
+    }
+
+    // Cancel confirmation dialog
+    cancelTarget?.let { appt ->
+        val docName = "Dr. ${appt.doctor.user.firstName} ${appt.doctor.user.lastName}"
+        AlertDialog(
+            onDismissRequest = { cancelTarget = null },
+            title = { Text("Cancel Appointment?") },
+            text = {
+                Text("Cancel your $docName appointment on ${appt.appointmentDate} at ${appt.startTime.take(5)}?")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val targetId = appt.id
+                    cancelTarget = null
+                    scope.launch {
+                        try {
+                            val resp = api.cancelAppointment(targetId, "Cancelled by patient")
+                            if (resp.success) {
+                                snackbarHostState.showSnackbar("✅ Appointment cancelled")
+                                loadAppointments()
+                            } else {
+                                snackbarHostState.showSnackbar(resp.error ?: "Could not cancel appointment")
+                            }
+                        } catch (_: Exception) {
+                            snackbarHostState.showSnackbar("Could not cancel appointment")
+                        }
+                    }
+                }) {
+                    Text("Yes, cancel it", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { cancelTarget = null }) {
+                    Text("Keep it")
+                }
+            }
+        )
     }
 }

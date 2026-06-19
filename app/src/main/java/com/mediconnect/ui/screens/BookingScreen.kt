@@ -40,6 +40,7 @@ fun BookingScreen(navController: NavController) {
     var loading by remember { mutableStateOf(true) }
     var booking by remember { mutableStateOf(false) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     // Load doctor details
     LaunchedEffect(doctorId) {
@@ -67,6 +68,7 @@ fun BookingScreen(navController: NavController) {
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Book Appointment", fontWeight = FontWeight.Bold) },
@@ -149,7 +151,7 @@ fun BookingScreen(navController: NavController) {
                                 )
                             )
                             if (resp.success) {
-                                Toast.makeText(context, "Appointment booked!", Toast.LENGTH_SHORT).show()
+                                scope.launch { snackbarHostState.showSnackbar("✅ Appointment booked!") }
                                 navController.navigate(Screen.Appointments.route) {
                                     popUpTo(Screen.Home.route)
                                 }

@@ -38,7 +38,7 @@ fun HomeScreen(navController: NavController) {
         try {
             val response = api.getSpecialties()
             if (response.success) {
-                specialties = response.data
+                specialties = response.data ?: emptyList()
             }
         } catch (_: Exception) { /* silently fall back to empty */ }
         loading = false
@@ -69,7 +69,7 @@ fun HomeScreen(navController: NavController) {
                 )
                 NavigationBarItem(
                     selected = false,
-                    onClick = { navController.navigate(Screen.Doctors.route) },
+                    onClick = { navController.navigate(Screen.Doctors.createRoute()) },
                     icon = { Icon(Icons.Default.Search, contentDescription = null) },
                     label = { Text("Doctors") }
                 )
@@ -124,7 +124,7 @@ fun HomeScreen(navController: NavController) {
                     QuickActionCard(
                         icon = Icons.Default.Search,
                         label = "Find a Doctor",
-                        onClick = { navController.navigate(Screen.Doctors.route) },
+                        onClick = { navController.navigate(Screen.Doctors.createRoute()) },
                         modifier = Modifier.weight(1f)
                     )
                     QuickActionCard(
@@ -159,7 +159,7 @@ fun HomeScreen(navController: NavController) {
                 )
                 items(fallback) { (name, emoji) ->
                     SpecialtyCard(emoji = emoji, name = name, onClick = {
-                        navController.navigate(Screen.Doctors.route)
+                        navController.navigate(Screen.Doctors.createRoute(specialty = name))
                     })
                 }
             } else {
@@ -177,7 +177,7 @@ fun HomeScreen(navController: NavController) {
                         k.contains(specialty.name, ignoreCase = true)
                     }?.value ?: "🩺"
                     SpecialtyCard(emoji = emoji, name = specialty.name, onClick = {
-                        navController.navigate(Screen.Doctors.route)
+                        navController.navigate(Screen.Doctors.createRoute(specialty = specialty.name))
                     })
                 }
             }

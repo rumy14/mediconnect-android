@@ -7,7 +7,10 @@ sealed class Screen(val route: String) {
     data object Login : Screen("login")
     data object Register : Screen("register")
     data object Home : Screen("home")
-    data object Doctors : Screen("doctors")
+    data object Doctors : Screen("doctors?specialty={specialty}") {
+        fun createRoute(specialty: String? = null) =
+            if (specialty != null) "doctors?specialty=$specialty" else "doctors"
+    }
     data object DoctorDetail : Screen("doctors/{doctorId}") {
         fun createRoute(doctorId: String) = "doctors/$doctorId"
     }

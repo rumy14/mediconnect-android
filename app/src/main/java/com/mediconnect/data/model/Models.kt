@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class ApiResponse<T>(
     val success: Boolean,
-    val data: T,
+    val data: T? = null,
     val message: String? = null,
     val error: String? = null
 )
@@ -115,14 +115,14 @@ data class DoctorDetail(
 
 @Serializable
 data class UserName(
-    val id: String,
+    val id: String? = null,
     val firstName: String,
     val lastName: String
 )
 
 @Serializable
 data class UserNameWithEmail(
-    val id: String,
+    val id: String? = null,
     val firstName: String,
     val lastName: String,
     val email: String,
@@ -136,7 +136,7 @@ data class DoctorSpecialtyInfo(
 
 @Serializable
 data class SpecialtyInfo(
-    val id: String,
+    val id: String? = null,
     val name: String,
     val icon: String? = null,
     val description: String? = null
