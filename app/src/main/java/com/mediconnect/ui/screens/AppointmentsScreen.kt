@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.mediconnect.data.api.MediConnectApi
 import com.mediconnect.data.model.AppointmentSummary
+import com.mediconnect.navigation.Screen
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -81,8 +82,41 @@ fun AppointmentsScreen(navController: NavController) {
             TopAppBar(
                 title = { Text("My Appointments", fontWeight = FontWeight.Bold) },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
-                navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } }
+                navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
+                actions = {
+                    IconButton(onClick = { navController.navigate(Screen.Profile.route) }) {
+                        Icon(Icons.Default.Person, contentDescription = "Profile")
+                    }
+                }
             )
+        },
+        bottomBar = {
+            NavigationBar {
+                NavigationBarItem(
+                    selected = false,
+                    onClick = { navController.navigate(Screen.Home.route) { popUpTo(0) { saveState = true }; launchSingleTop = true } },
+                    icon = { Icon(Icons.Default.Home, contentDescription = null) },
+                    label = { Text("Home") }
+                )
+                NavigationBarItem(
+                    selected = false,
+                    onClick = { navController.navigate(Screen.Doctors.createRoute()) { popUpTo(0) { saveState = true }; launchSingleTop = true } },
+                    icon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    label = { Text("Doctors") }
+                )
+                NavigationBarItem(
+                    selected = true,
+                    onClick = {},
+                    icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
+                    label = { Text("Appointments") }
+                )
+                NavigationBarItem(
+                    selected = false,
+                    onClick = { navController.navigate(Screen.VoiceCallHistory.route) { popUpTo(0) { saveState = true }; launchSingleTop = true } },
+                    icon = { Icon(Icons.Default.History, contentDescription = null) },
+                    label = { Text("Call History") }
+                )
+            }
         }
     ) { padding ->
         LazyColumn(
@@ -120,6 +154,7 @@ fun AppointmentsScreen(navController: NavController) {
                     val status = statusLabel(appointment.status)
 
                     Card(
+                        onClick = { navController.navigate(Screen.DoctorDetail.createRoute(doctor.id)) },
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
                     ) {

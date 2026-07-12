@@ -133,4 +133,25 @@ class MediConnectApi private constructor() {
             withAuth()
             reason?.let { setBody(mapOf("reason" to it)) }
         }.body()
+
+    // ── Voice Call History ──
+
+    suspend fun saveVoiceCall(body: SaveVoiceCallRequest): ApiResponse<VoiceCallResponse> =
+        client.post("vapi/calls") {
+            withAuth()
+            setBody(body)
+        }.body()
+
+    suspend fun getVoiceCalls(page: Int = 1, limit: Int = 20): PaginatedResponse<VoiceCallSummary> =
+        client.get("vapi/calls") {
+            withAuth()
+            parameter("page", page)
+            parameter("limit", limit)
+        }.body()
+
+    suspend fun getVoiceCall(id: String): ApiResponse<VoiceCallDetail> =
+        client.get("vapi/calls/$id") { withAuth() }.body()
+
+    suspend fun deleteVoiceCall(id: String): ApiResponse<Unit> =
+        client.delete("vapi/calls/$id") { withAuth() }.body()
 }

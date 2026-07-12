@@ -5,8 +5,10 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.media.AudioManager
 import android.os.Build
+import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.ViewGroup
+import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -39,9 +41,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import com.mediconnect.data.api.MediConnectApi
+import com.mediconnect.data.model.SaveVoiceCallRequest
+import com.mediconnect.data.model.VoiceCallTranscriptEntry
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import java.io.InputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 /**
  * VAPI Voice Assistant Configuration
@@ -54,6 +64,9 @@ object VapiConfig {
 /**
  * Fullscreen voice call dialog powered by VAPI.ai via WebView.
  * Shows when [show] is true; calls [onDismiss] when user closes.
+ *
+ * Captures transcript in real-time via JavascriptInterface and POSTs
+ * the completed call data to the MediConnect API on call end.
  */
 @Composable
 fun VapiVoiceCallDialog(
@@ -63,6 +76,7 @@ fun VapiVoiceCallDialog(
     if (!show) return
 
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     // —— Permission state ——
     var hasMicPermission by remember {
@@ -135,7 +149,8 @@ fun VapiVoiceCallDialog(
             } else {
                 // Voice call WebView with smooth end transition
                 VapiVoiceCallSurface(
-                    onDismiss = onDismiss
+                    onDismiss = onDismiss,
+                    scope = scope
                 )
             }
         }
@@ -187,13 +202,15 @@ private fun PermissionPrompt(
  *
  * Lifecycle:
  *   1. WebView mounts and starts the VAPI call.
- *   2. When the close button is tapped (or call ends), we signal VAPI to stop
- *      and reveal an "end-of-call" overlay.
- *   3. After ~1.4s the overlay fades in, then onDismiss() runs.
+ *   2. Transcript entries are captured in real-time via [VoiceCallBridge].
+ *   3. When the close button is tapped (or call ends), we signal VAPI to stop,
+ *      POST the transcript to the API, and reveal an "end-of-call" overlay.
+ *   4. After ~1.4s the overlay fades in, then onDismiss() runs.
  */
 @Composable
 private fun VapiVoiceCallSurface(
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    scope: kotlinx.coroutines.CoroutineScope
 ) {
     val context = LocalContext.current
     val audioManager = remember {
@@ -222,6 +239,28 @@ private fun VapiVoiceCallSurface(
         }
     }
 
+    // —— Transcript capture state ——
+    val transcriptEntries = remember { mutableListOf<VoiceCallTranscriptEntry>() }
+    var callStartedAt by remember { mutableStateOf<Long>(SystemClock.elapsedRealtime()) }
+    var callEnded by remember { mutableStateOf(false) }
+
+    // —— Fetch doctors list and inject into WebView for VAPI assistant ——
+    LaunchedEffect(Unit) {
+        try {
+            val api = com.mediconnect.data.api.MediConnectApi.getInstance()
+            val resp = api.getDoctors()
+            if (resp.success) {
+                val json = resp.data.joinToString(",") { doc ->
+                    "{\"firstName\":\"${doc.user.firstName}\",\"lastName\":\"${doc.user.lastName}\",\"specialties\":[${doc.specialties.joinToString(",") { "\"${it.specialty.name}\"" }}],\"fee\":\"${doc.consultationFee.toInt()}\"}"
+                }
+                val doctorsJson = "[$json]"
+                // Wait for WebView to be ready, then inject
+                kotlinx.coroutines.delay(1000)
+                webView?.evaluateJavascript("window.VapiBridge?.setDoctors('$doctorsJson');", null)
+            }
+        } catch (_: Exception) { }
+    }
+
     // —— Force loudspeaker (speakerphone) so the AI voice plays out loud, not the earpiece ——
     LaunchedEffect(Unit) {
         audioManager?.let { am ->
@@ -239,10 +278,54 @@ private fun VapiVoiceCallSurface(
         }
     }
 
+    /** Format an ISO-8601 timestamp for the current moment. */
+    fun nowIso(): String {
+        val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
+        sdf.timeZone = TimeZone.getTimeZone("UTC")
+        return sdf.format(Date())
+    }
+
+    /** Save the captured transcript to the API and return a status message. */
+    fun saveTranscript(): String {
+        if (transcriptEntries.isEmpty()) {
+            return "Call ended"
+        }
+
+        val endedAt = nowIso()
+        val durationMs = SystemClock.elapsedRealtime() - callStartedAt
+        val durationSec = (durationMs / 1000).toInt()
+
+        scope.launch {
+            try {
+                val api = MediConnectApi.getInstance()
+                val request = SaveVoiceCallRequest(
+                    status = "COMPLETED",
+                    durationSeconds = durationSec,
+                    startedAt = endedAt,
+                    endedAt = endedAt,
+                    transcript = transcriptEntries.toList()
+                )
+                val response = api.saveVoiceCall(request)
+                if (!response.success) {
+                    android.util.Log.w("VoiceCall", "Failed to save transcript: ${response.error}")
+                } else {
+                    android.util.Log.i("VoiceCall", "Transcript saved: ${response.data?.id}")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("VoiceCall", "Error saving transcript", e)
+            }
+        }
+        return "Call ended"
+    }
+
     val handleClose: () -> Unit = {
-        // Stop the VAPI call cleanly, then run the closing transition.
-        webView?.evaluateJavascript("window.VapiBridge?.end();", null)
-        endMessage = "Call ended"
+        if (!callEnded) {
+            callEnded = true
+            // Stop the VAPI call cleanly
+            webView?.evaluateJavascript("window.VapiBridge?.end();", null)
+            // Save the transcript
+            endMessage = saveTranscript()
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -251,9 +334,13 @@ private fun VapiVoiceCallSurface(
             audioManager = audioManager,
             userJwt = userJwt,
             userName = userName,
+            transcriptEntries = transcriptEntries,
             onWebViewReady = { webView = it },
             onCallEndedExternally = {
-                endMessage = "Call ended"
+                if (!callEnded) {
+                    callEnded = true
+                    endMessage = saveTranscript()
+                }
             }
         )
 
@@ -286,7 +373,7 @@ private fun VapiVoiceCallSurface(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Closing…",
+                        text = "Saving transcript…",
                         color = Color.White.copy(alpha = 0.5f),
                         fontSize = 13.sp
                     )
@@ -342,17 +429,55 @@ private fun VapiVoiceCallSurface(
     }
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+//  JavascriptInterface — bridges transcript data from WebView JS to Kotlin
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Bridge object exposed to the WebView JavaScript via [WebView.addJavascriptInterface].
+ *
+ * The JS side calls:
+ *   AndroidBridge.onTranscript(role, text, timestamp, transcriptType)
+ *   AndroidBridge.onCallEnded()
+ *
+ * All arguments are passed as JSON strings for safety across the bridge boundary.
+ */
+class VoiceCallBridge(
+    private val transcriptEntries: MutableList<VoiceCallTranscriptEntry>,
+    private val onCallEnded: () -> Unit
+) {
+    @JavascriptInterface
+    fun onTranscript(role: String, text: String, timestamp: String, transcriptType: String) {
+        val entry = VoiceCallTranscriptEntry(
+            role = role,
+            text = text,
+            timestamp = timestamp,
+            transcriptType = transcriptType
+        )
+        transcriptEntries.add(entry)
+    }
+
+    @JavascriptInterface
+    fun onCallEnded() {
+        onCallEnded()
+    }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+
 /**
  * The WebView that loads vapi_voice.html.
  *
  * - Reports the WebView upward so the parent can call end() on close.
  * - Reports when the server-side call ends so we can show the closing overlay.
+ * - Bridges transcript data to Kotlin via [VoiceCallBridge].
  */
 @Composable
 private fun VoiceCallWebView(
     audioManager: AudioManager?,
     userJwt: String,
     userName: String,
+    transcriptEntries: MutableList<VoiceCallTranscriptEntry>,
     onWebViewReady: (WebView) -> Unit,
     onCallEndedExternally: () -> Unit
 ) {
@@ -369,7 +494,7 @@ private fun VoiceCallWebView(
         }
     }
 
-    // Load the HTML content with key/assistant/user injected
+    // Load the HTML content with key/assistant/user injected (doctors fetched separately)
     val htmlContent = remember(userJwt, userName) {
         try {
             val inputStream: InputStream = context.assets.open("vapi_voice.html")
@@ -379,6 +504,7 @@ private fun VoiceCallWebView(
                 .replace("__ASSISTANT_ID__", VapiConfig.ASSISTANT_ID)
                 .replace("__USER_JWT__", userJwt.escapeJsString())
                 .replace("__USER_NAME__", userName.escapeJsString())
+                .replace("__API_BASE__", com.mediconnect.BuildConfig.API_BASE_URL)
         } catch (e: Exception) {
             null
         }
@@ -443,9 +569,13 @@ private fun VoiceCallWebView(
                         }
                     }
 
+                    // —— Add the JavaScript bridge for transcript capture ——
+                    val bridge = VoiceCallBridge(transcriptEntries, onCallEndedExternally)
+                    addJavascriptInterface(bridge, "AndroidBridge")
+
                     // Load the HTML
                     htmlContent?.let { data ->
-                        loadDataWithBaseURL("https://mediconnect.local", data, "text/html", "UTF-8", null)
+                        loadDataWithBaseURL("https://mediconnect.nma-it.com/api/", data, "text/html", "UTF-8", null)
                     } ?: run {
                         loadUrl("about:blank")
                     }

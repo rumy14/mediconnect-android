@@ -22,6 +22,8 @@ import com.mediconnect.data.model.Specialty
 import com.mediconnect.navigation.Screen
 import kotlinx.coroutines.launch
 
+private val navItems = listOf("Home", "Doctors", "Appointments")
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DoctorsScreen(
@@ -73,8 +75,41 @@ fun DoctorsScreen(
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
+                },
+                actions = {
+                    IconButton(onClick = { navController.navigate(Screen.Profile.route) }) {
+                        Icon(Icons.Default.Person, contentDescription = "Profile")
+                    }
                 }
             )
+        },
+        bottomBar = {
+            NavigationBar {
+                NavigationBarItem(
+                    selected = false,
+                    onClick = { navController.navigate(Screen.Home.route) { popUpTo(0) { saveState = true }; launchSingleTop = true } },
+                    icon = { Icon(Icons.Default.Home, contentDescription = null) },
+                    label = { Text("Home") }
+                )
+                NavigationBarItem(
+                    selected = true,
+                    onClick = {},
+                    icon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    label = { Text("Doctors") }
+                )
+                NavigationBarItem(
+                    selected = false,
+                    onClick = { navController.navigate(Screen.Appointments.route) { popUpTo(0) { saveState = true }; launchSingleTop = true } },
+                    icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
+                    label = { Text("Appointments") }
+                )
+                NavigationBarItem(
+                    selected = false,
+                    onClick = { navController.navigate(Screen.VoiceCallHistory.route) { popUpTo(0) { saveState = true }; launchSingleTop = true } },
+                    icon = { Icon(Icons.Default.History, contentDescription = null) },
+                    label = { Text("Call History") }
+                )
+            }
         }
     ) { padding ->
         LazyColumn(

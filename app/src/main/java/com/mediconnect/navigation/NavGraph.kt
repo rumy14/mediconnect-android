@@ -10,12 +10,10 @@ import androidx.navigation.navArgument
 import com.mediconnect.data.api.MediConnectApi
 import com.mediconnect.data.session.SessionManager
 import com.mediconnect.ui.screens.*
-import kotlinx.coroutines.launch
 
 @Composable
 fun MediConnectNavGraph(navController: NavHostController) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val api = remember { MediConnectApi.getInstance() }
 
     var startDestination by remember { mutableStateOf<String?>(null) }
@@ -94,23 +92,22 @@ fun MediConnectNavGraph(navController: NavHostController) {
             AppointmentsScreen(navController = navController)
         }
 
-        composable(
-            route = Screen.AppointmentDetail.route,
-            arguments = listOf(
-                navArgument("appointmentId") { type = NavType.StringType }
-            )
-        ) {
-            // Navigate to appointments screen with auto-scroll to detail
-            AppointmentsScreen(navController = navController)
-        }
-
         composable(Screen.Profile.route) {
             ProfileScreen(navController = navController)
         }
 
-        // Separate route for sign-out redirect
-        composable("login") {
-            LoginScreen(navController = navController)
+        composable(Screen.VoiceCallHistory.route) {
+            VoiceCallHistoryScreen(navController = navController)
+        }
+
+        composable(
+            route = Screen.VoiceCallDetail.route,
+            arguments = listOf(
+                navArgument("callId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val callId = backStackEntry.arguments?.getString("callId") ?: return@composable
+            VoiceCallDetailScreen(navController = navController, callId = callId)
         }
     }
 }

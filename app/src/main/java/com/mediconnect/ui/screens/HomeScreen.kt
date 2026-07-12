@@ -32,6 +32,7 @@ fun HomeScreen(navController: NavController) {
 
     var specialties by remember { mutableStateOf<List<Specialty>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
+    var showAiVoice by remember { mutableStateOf(false) }
 
     // Load specialties on first composition
     LaunchedEffect(Unit) {
@@ -45,6 +46,14 @@ fun HomeScreen(navController: NavController) {
     }
 
     Scaffold(
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { showAiVoice = true },
+                containerColor = MaterialTheme.colorScheme.primary
+            ) {
+                Icon(Icons.Default.Mic, contentDescription = "AI Assistant")
+            }
+        },
         topBar = {
             TopAppBar(
                 title = { Text("MediConnect", fontWeight = FontWeight.Bold) },
@@ -78,6 +87,12 @@ fun HomeScreen(navController: NavController) {
                     onClick = { navController.navigate(Screen.Appointments.route) },
                     icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
                     label = { Text("Appointments") }
+                )
+                NavigationBarItem(
+                    selected = false,
+                    onClick = { navController.navigate(Screen.VoiceCallHistory.route) },
+                    icon = { Icon(Icons.Default.History, contentDescription = null) },
+                    label = { Text("Call History") }
                 )
             }
         }
@@ -185,6 +200,12 @@ fun HomeScreen(navController: NavController) {
             item { Spacer(modifier = Modifier.height(16.dp)) }
         }
     }
+
+    // ── AI Voice Assistant ──
+    VapiVoiceCallDialog(
+        show = showAiVoice,
+        onDismiss = { showAiVoice = false }
+    )
 }
 
 @Composable

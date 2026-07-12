@@ -154,6 +154,88 @@ data class TimeSlot(
     val isBooked: Boolean = false
 )
 
+// ── Voice Call History ──
+
+@Serializable
+data class VoiceCallTranscriptEntry(
+    val role: String,  // "user" or "assistant"
+    val text: String,
+    val timestamp: String,
+    @SerialName("transcript_type")
+    val transcriptType: String = "final"
+)
+
+@Serializable
+data class SaveVoiceCallRequest(
+    @SerialName("vapi_call_id")
+    val vapiCallId: String? = null,
+    val status: String,
+    @SerialName("duration_seconds")
+    val durationSeconds: Int,
+    @SerialName("started_at")
+    val startedAt: String,
+    @SerialName("ended_at")
+    val endedAt: String,
+    val transcript: List<VoiceCallTranscriptEntry>,
+    val summary: String? = null,
+    val metadata: Map<String, String>? = null
+)
+
+@Serializable
+data class VoiceCallResponse(
+    val id: String,
+    @SerialName("user_id")
+    val userId: String? = null,
+    val status: String,
+    @SerialName("duration_seconds")
+    val durationSeconds: Int? = null,
+    @SerialName("transcript_count")
+    val transcriptCount: Int? = null,
+    @SerialName("started_at")
+    val startedAt: String? = null,
+    @SerialName("ended_at")
+    val endedAt: String? = null
+)
+
+@Serializable
+data class VoiceCallSummary(
+    val id: String,
+    val status: String,
+    @SerialName("duration_seconds")
+    val durationSeconds: Int? = null,
+    @SerialName("started_at")
+    val startedAt: String? = null,
+    @SerialName("ended_at")
+    val endedAt: String? = null,
+    val summary: String? = null,
+    val metadata: Map<String, String>? = null,
+    @SerialName("transcript_preview")
+    val transcriptPreview: String? = null,
+    @SerialName("message_count")
+    val messageCount: Int? = null
+)
+
+@Serializable
+data class VoiceCallDetail(
+    val id: String,
+    @SerialName("user_id")
+    val userId: String? = null,
+    @SerialName("vapi_call_id")
+    val vapiCallId: String? = null,
+    val status: String,
+    @SerialName("duration_seconds")
+    val durationSeconds: Int? = null,
+    @SerialName("started_at")
+    val startedAt: String? = null,
+    @SerialName("ended_at")
+    val endedAt: String? = null,
+    val transcript: List<VoiceCallTranscriptEntry>? = null,
+    val summary: String? = null,
+    val metadata: Map<String, String>? = null,
+    @SerialName("created_at")
+    val createdAt: String? = null
+)
+
 // ── Appointment ──
 
 @Serializable

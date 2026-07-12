@@ -13,8 +13,8 @@ android {
         applicationId = "com.mediconnect"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.0.1"
+        versionCode = 5
+        versionName = "1.0.4"
 
         // ✅ Live API server
         buildConfigField("String", "API_BASE_URL", "\"https://mediconnect.nma-it.com/api/\"")
@@ -90,6 +90,9 @@ dependencies {
 
     // Local storage
     implementation("androidx.datastore:datastore-preferences:1.1.3")
+
+    // Biometric auth
+    implementation("androidx.biometric:biometric:1.2.0-alpha05")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

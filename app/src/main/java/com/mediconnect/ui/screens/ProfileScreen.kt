@@ -16,6 +16,7 @@ import androidx.navigation.NavController
 import com.mediconnect.data.api.MediConnectApi
 import com.mediconnect.data.model.UserResponse
 import com.mediconnect.data.session.SessionManager
+import com.mediconnect.navigation.Screen
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -45,6 +46,34 @@ fun ProfileScreen(navController: NavController) {
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
                 navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } }
             )
+        },
+        bottomBar = {
+            NavigationBar {
+                NavigationBarItem(
+                    selected = false,
+                    onClick = { navController.navigate(Screen.Home.route) { popUpTo(0) { saveState = true }; launchSingleTop = true } },
+                    icon = { Icon(Icons.Default.Home, contentDescription = null) },
+                    label = { Text("Home") }
+                )
+                NavigationBarItem(
+                    selected = false,
+                    onClick = { navController.navigate(Screen.Doctors.createRoute()) { popUpTo(0) { saveState = true }; launchSingleTop = true } },
+                    icon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    label = { Text("Doctors") }
+                )
+                NavigationBarItem(
+                    selected = false,
+                    onClick = { navController.navigate(Screen.Appointments.route) { popUpTo(0) { saveState = true }; launchSingleTop = true } },
+                    icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
+                    label = { Text("Appointments") }
+                )
+                NavigationBarItem(
+                    selected = false,
+                    onClick = { navController.navigate(Screen.VoiceCallHistory.route) { popUpTo(0) { saveState = true }; launchSingleTop = true } },
+                    icon = { Icon(Icons.Default.History, contentDescription = null) },
+                    label = { Text("Call History") }
+                )
+            }
         }
     ) { padding ->
         Column(
@@ -100,7 +129,7 @@ fun ProfileScreen(navController: NavController) {
                     scope.launch {
                         session.clearSession()
                         api.setToken(null)
-                        navController.navigate("login") {
+                        navController.navigate(Screen.Login.route) {
                             popUpTo(0) { inclusive = true }
                         }
                     }
