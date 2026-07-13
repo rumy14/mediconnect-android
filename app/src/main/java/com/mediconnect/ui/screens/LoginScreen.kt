@@ -3,11 +3,9 @@ package com.mediconnect.ui.screens
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
@@ -89,13 +87,12 @@ fun LoginScreen(navController: NavController) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(56.dp))
+            // ── Top: Header area ──
+            Spacer(modifier = Modifier.height(48.dp))
 
-            // Header: Cross icon + brand
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(bottom = 4.dp)
@@ -107,266 +104,210 @@ fun LoginScreen(navController: NavController) {
                         .background(AccentTeal),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "+",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
+                    Text("+", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
                 Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = "MediConnect",
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
+                Text("MediConnect", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
             }
-            Text(
-                text = "Your Healthcare Connection",
-                fontSize = 13.sp,
-                color = White60
-            )
+            Text("Your Healthcare Connection", fontSize = 13.sp, color = White60)
 
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Card container
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = CardBg),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 28.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+            // ── Center: Card (expand to fill space) ──
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = CardBg),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
-                    // User icon
-                    Box(
+                    Column(
                         modifier = Modifier
-                            .size(56.dp)
-                            .clip(CircleShape)
-                            .background(White30),
-                        contentAlignment = Alignment.Center
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Icon(
-                            Icons.Default.Person,
-                            contentDescription = null,
-                            tint = White60,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(14.dp))
-                    Text(
-                        text = "Sign In to Your Account",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White
-                    )
-                    Spacer(modifier = Modifier.height(24.dp))
+                        // User icon
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(White30),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Person, contentDescription = null, tint = White60, modifier = Modifier.size(28.dp))
+                        }
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text("Sign In to Your Account", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                        Spacer(modifier = Modifier.height(24.dp))
 
-                    // Error message
-                    errorMsg?.let {
-                        Text(
-                            it,
-                            color = MaterialTheme.colorScheme.error,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                    }
+                        // Error message
+                        errorMsg?.let {
+                            Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp, modifier = Modifier.padding(bottom = 8.dp))
+                        }
 
-                    // Email field
-                    OutlinedTextField(
-                        value = email,
-                        onValueChange = { email = it; errorMsg = null },
-                        label = { Text("Email", color = White60) },
-                        leadingIcon = {
-                            Icon(Icons.Default.Email, contentDescription = null, tint = White60)
-                        },
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Email,
-                            imeAction = ImeAction.Next
-                        ),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !loading,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = AccentTeal,
-                            unfocusedBorderColor = Color.Transparent,
-                            cursorColor = AccentTeal,
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedContainerColor = InputBg,
-                            unfocusedContainerColor = InputBg
+                        // Email field
+                        OutlinedTextField(
+                            value = email,
+                            onValueChange = { email = it; errorMsg = null },
+                            label = { Text("Email", color = White60) },
+                            leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = White60) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !loading,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = AccentTeal,
+                                unfocusedBorderColor = Color.Transparent,
+                                cursorColor = AccentTeal,
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedContainerColor = InputBg,
+                                unfocusedContainerColor = InputBg
+                            )
                         )
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
-                    // Password field
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = { password = it; errorMsg = null },
-                        label = { Text("Password", color = White60) },
-                        leadingIcon = {
-                            Icon(Icons.Default.Lock, contentDescription = null, tint = White60)
-                        },
-                        visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Password,
-                            imeAction = ImeAction.Done
-                        ),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !loading,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = AccentTeal,
-                            unfocusedBorderColor = Color.Transparent,
-                            cursorColor = AccentTeal,
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedContainerColor = InputBg,
-                            unfocusedContainerColor = InputBg
+                        // Password field
+                        OutlinedTextField(
+                            value = password,
+                            onValueChange = { password = it; errorMsg = null },
+                            label = { Text("Password", color = White60) },
+                            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = White60) },
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !loading,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = AccentTeal,
+                                unfocusedBorderColor = Color.Transparent,
+                                cursorColor = AccentTeal,
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedContainerColor = InputBg,
+                                unfocusedContainerColor = InputBg
+                            )
                         )
-                    )
-                    Spacer(modifier = Modifier.height(24.dp))
+                        Spacer(modifier = Modifier.height(24.dp))
 
-                    // Sign In button
-                    Button(
-                        onClick = {
-                            errorMsg = null
-                            when {
-                                email.isBlank() -> errorMsg = "Email is required"
-                                !email.contains("@") -> errorMsg = "Enter a valid email address"
-                                password.isBlank() -> errorMsg = "Password is required"
-                                password.length < 6 -> errorMsg = "Password must be at least 6 characters"
-                                else -> {
-                                    loading = true
-                                    scope.launch {
-                                        try {
-                                            val response = api.login(
-                                                LoginRequest(
-                                                    email = email.trim(),
-                                                    password = password
-                                                )
-                                            )
-                                            if (response.success && response.data != null) {
-                                                api.setToken(response.data.token)
-                                                session.saveSession(response.data.token, response.data.user)
-                                                navController.navigate(Screen.Home.route) {
-                                                    popUpTo(Screen.Login.route) { inclusive = true }
+                        // Sign In button
+                        Button(
+                            onClick = {
+                                errorMsg = null
+                                when {
+                                    email.isBlank() -> errorMsg = "Email is required"
+                                    !email.contains("@") -> errorMsg = "Enter a valid email address"
+                                    password.isBlank() -> errorMsg = "Password is required"
+                                    password.length < 6 -> errorMsg = "Password must be at least 6 characters"
+                                    else -> {
+                                        loading = true
+                                        scope.launch {
+                                            try {
+                                                val response = api.login(LoginRequest(email = email.trim(), password = password))
+                                                if (response.success && response.data != null) {
+                                                    api.setToken(response.data.token)
+                                                    session.saveSession(response.data.token, response.data.user)
+                                                    navController.navigate(Screen.Home.route) {
+                                                        popUpTo(Screen.Login.route) { inclusive = true }
+                                                    }
+                                                } else {
+                                                    errorMsg = response.error ?: response.message ?: "Invalid email or password"
+                                                    loading = false
                                                 }
-                                            } else {
-                                                errorMsg = response.error ?: response.message ?: "Invalid email or password"
+                                            } catch (e: Exception) {
+                                                val msg = e.message ?: ""
+                                                errorMsg = when {
+                                                    msg.contains("401") -> "Invalid email or password"
+                                                    msg.contains("timeout") -> "Connection timed out"
+                                                    msg.contains("resolve") || msg.contains("connect") -> "No internet connection"
+                                                    else -> "Something went wrong"
+                                                }
                                                 loading = false
                                             }
-                                        } catch (e: Exception) {
-                                            val msg = e.message ?: ""
-                                            errorMsg = when {
-                                                msg.contains("401") -> "Invalid email or password"
-                                                msg.contains("timeout") -> "Connection timed out"
-                                                msg.contains("resolve") || msg.contains("connect") -> "No internet connection"
-                                                else -> "Something went wrong"
-                                            }
-                                            loading = false
                                         }
                                     }
                                 }
+                            },
+                            enabled = !loading,
+                            modifier = Modifier.fillMaxWidth().height(50.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentTeal)
+                        ) {
+                            if (loading) {
+                                CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+                            } else {
+                                Text("Sign In", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
                             }
-                        },
-                        enabled = !loading,
-                        modifier = Modifier.fillMaxWidth().height(50.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = AccentTeal)
-                    ) {
-                        if (loading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                color = Color.White,
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Text("Sign In", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
                         }
-                    }
-                    // Biometric login button (visible if hardware supports it)
-                    if (biometricAvailable) {
-                        OutlinedButton(
-                            onClick = {
-                                val activity = context as? FragmentActivity ?: return@OutlinedButton
-                                val prompt = BiometricPrompt(
-                                    activity,
-                                    ContextCompat.getMainExecutor(context),
-                                    object : BiometricPrompt.AuthenticationCallback() {
-                                        override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                                            scope.launch {
-                                                try {
-                                                    val token = session.getToken()
-                                                    if (!token.isNullOrBlank()) {
-                                                        api.setToken(token)
-                                                        navController.navigate(Screen.Home.route) {
-                                                            popUpTo(Screen.Login.route) { inclusive = true }
-                                                        }
-                                                    } else {
-                                                        errorMsg = "No saved session"
-                                                    }
-                                                } catch (_: Exception) {
-                                                    errorMsg = "Authentication failed"
+
+                        // Biometric login
+                        if (biometricAvailable) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    val activity = context as? FragmentActivity ?: return@OutlinedButton
+                                    val prompt = BiometricPrompt(
+                                        activity,
+                                        ContextCompat.getMainExecutor(context),
+                                        object : BiometricPrompt.AuthenticationCallback() {
+                                            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                                                scope.launch {
+                                                    try {
+                                                        val token = session.getToken()
+                                                        if (!token.isNullOrBlank()) {
+                                                            api.setToken(token)
+                                                            navController.navigate(Screen.Home.route) {
+                                                                popUpTo(Screen.Login.route) { inclusive = true }
+                                                            }
+                                                        } else errorMsg = "No saved session"
+                                                    } catch (_: Exception) { errorMsg = "Authentication failed" }
                                                 }
                                             }
-                                        }
-                                        override fun onAuthenticationError(errCode: Int, errString: CharSequence) {
-                                            if (errCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON) {
-                                                errorMsg = errString.toString()
+                                            override fun onAuthenticationError(errCode: Int, errString: CharSequence) {
+                                                if (errCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON) errorMsg = errString.toString()
                                             }
                                         }
-                                    }
-                                )
-                                prompt.authenticate(
-                                    BiometricPrompt.PromptInfo.Builder()
-                                        .setTitle("MediConnect")
-                                        .setSubtitle("Use fingerprint to sign in")
-                                        .setNegativeButtonText("Cancel")
-                                        .build()
-                                )
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Biometric Sign In", fontSize = 14.sp)
+                                    )
+                                    prompt.authenticate(
+                                        BiometricPrompt.PromptInfo.Builder()
+                                            .setTitle("MediConnect")
+                                            .setSubtitle("Use fingerprint to sign in")
+                                            .setNegativeButtonText("Cancel")
+                                            .build()
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Biometric Sign In", fontSize = 14.sp)
+                            }
                         }
+
+                        // Register link
                         Spacer(modifier = Modifier.height(16.dp))
-                    }
-
-                    // Register link
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Text("Don't have an account? ", fontSize = 13.sp, color = White60)
-                        TextButton(
-                            onClick = { navController.navigate(Screen.Register.route) },
-                            contentPadding = PaddingValues(0.dp)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
                         ) {
-                            Text("Register", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AccentTeal)
+                            Text("Don't have an account? ", fontSize = 13.sp, color = White60)
+                            TextButton(
+                                onClick = { navController.navigate(Screen.Register.route) },
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Text("Register", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AccentTeal)
+                            }
                         }
                     }
-
-
                 }
             }
 
-            Spacer(modifier = Modifier.height(40.dp))
-
-            // ── Version footer ──
+            // ── Bottom: Version footer ──
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
             ) {
                 Text(
                     text = "MediConnect v${BuildConfig.VERSION_NAME}",
@@ -377,8 +318,7 @@ fun LoginScreen(navController: NavController) {
                 )
                 val buildDate = remember {
                     try {
-                        SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US)
-                            .format(Date(BuildConfig.BUILD_EPOCH))
+                        SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date(BuildConfig.BUILD_EPOCH))
                     } catch (_: Exception) { "" }
                 }
                 Text(
@@ -388,8 +328,6 @@ fun LoginScreen(navController: NavController) {
                     letterSpacing = 1.sp
                 )
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 
