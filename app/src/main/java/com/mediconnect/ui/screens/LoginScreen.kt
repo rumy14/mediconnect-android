@@ -93,7 +93,7 @@ fun LoginScreen(navController: NavController) {
                 val current = BuildConfig.VERSION_NAME.split(".").map { it.toInt() }
                 val latest = info.latestVersion.split(".").map { it.toInt() }
                 // Compare version tuples
-                current.zip(latest).any { (c, l) -> l > c } || current.size < latest.size
+                info.latestVersionCode > BuildConfig.VERSION_CODE
             } catch (_: Exception) { false }
         } ?: false
     }

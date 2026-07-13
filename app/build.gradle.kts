@@ -13,8 +13,8 @@ android {
         applicationId = "com.mediconnect"
         minSdk = 26
         targetSdk = 35
-        versionCode = 7
-        versionName = "1.0.4"
+        versionCode = 8
+        versionName = "1.0.5"
 
         // ✅ Live API server
         buildConfigField("String", "API_BASE_URL", "\"https://mediconnect.nma-it.com/api/\"")
