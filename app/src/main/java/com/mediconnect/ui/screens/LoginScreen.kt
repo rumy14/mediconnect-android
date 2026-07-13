@@ -147,6 +147,7 @@ fun LoginScreen(navController: NavController) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .systemBarsPadding()
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -367,7 +368,7 @@ fun LoginScreen(navController: NavController) {
             // ── Bottom: Version footer ──
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+                modifier = Modifier.fillMaxWidth().safeDrawingPadding().padding(bottom = 48.dp)
             ) {
                 Text(
                     text = "MediConnect v${BuildConfig.VERSION_NAME}",
