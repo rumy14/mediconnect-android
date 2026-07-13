@@ -10,6 +10,7 @@ import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
@@ -154,4 +155,30 @@ class MediConnectApi private constructor() {
 
     suspend fun deleteVoiceCall(id: String): ApiResponse<Unit> =
         client.delete("vapi/calls/$id") { withAuth() }.body()
+
+    // ── Version Check (unofficial — fetches from web root, not API) ──
+
+    @Serializable
+    data class LatestVersionInfo(
+        val latestVersion: String,
+        val latestVersionCode: Int,
+        val downloadUrl: String,
+        val releaseNotes: String? = null,
+        val minimumVersion: String? = null
+    )
+
+    /**
+     * Fetch the latest published version info from the static version.json.
+     * This uses a separate HTTP call (not the Ktor client) to avoid
+     * conflating API base URL with the static file host.
+     */
+    suspend fun checkLatestVersion(): LatestVersionInfo? {
+        return try {
+            val url = java.net.URL("https://ai.nma-it.com/mediconnect-version.json")
+            val text = url.readText()
+            Json.decodeFromString<LatestVersionInfo>(text)
+        } catch (_: Exception) {
+            null
+        }
+    }
 }

@@ -75,6 +75,29 @@ fun LoginScreen(navController: NavController) {
         }
     }
 
+    // ── Check for app update ──
+    var latestVersionInfo by remember { mutableStateOf<com.mediconnect.data.api.MediConnectApi.LatestVersionInfo?>(null) }
+    var updateChecked by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        val info = api.checkLatestVersion()
+        if (info != null) {
+            latestVersionInfo = info
+        }
+        updateChecked = true
+    }
+
+    val hasUpdate = remember(latestVersionInfo) {
+        latestVersionInfo?.let { info ->
+            try {
+                val current = BuildConfig.VERSION_NAME.split(".").map { it.toInt() }
+                val latest = info.latestVersion.split(".").map { it.toInt() }
+                // Compare version tuples
+                current.zip(latest).any { (c, l) -> l > c } || current.size < latest.size
+            } catch (_: Exception) { false }
+        } ?: false
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -84,14 +107,51 @@ fun LoginScreen(navController: NavController) {
                 )
             )
     ) {
+        // ── Update banner (pinned to top) ──
+        if (hasUpdate && latestVersionInfo != null) {
+            Surface(
+                modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter),
+                color = Color(0xFFC8A45C).copy(alpha = 0.9f)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("⬆", fontSize = 14.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "v${latestVersionInfo!!.latestVersion} available",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF0A1628)
+                        )
+                        latestVersionInfo!!.releaseNotes?.let {
+                            Text(it, fontSize = 10.sp, color = Color(0xFF0A1628).copy(alpha = 0.7f), maxLines = 1)
+                        }
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(latestVersionInfo!!.downloadUrl))
+                            context.startActivity(intent)
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        border = BorderStroke(1.dp, Color(0xFF0A1628))
+                    ) {
+                        Text("Update", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF0A1628))
+                    }
+                }
+            }
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // ── Top: Header area ──
-            Spacer(modifier = Modifier.height(48.dp))
+            // ── Top: Header area (leave room for update banner overlay) ──
+            Spacer(modifier = Modifier.height(if (hasUpdate) 100.dp else 48.dp))
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,

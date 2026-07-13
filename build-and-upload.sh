@@ -100,6 +100,19 @@ cp "$APK_SRC" "$APK_LATEST"
 echo "   ✅ $APK_VER"
 echo "   ✅ $APK_LATEST (latest)"
 
+# ── Update version.json ──
+VERSION_JSON="$WEB_DIR/mediconnect-version.json"
+cat > "$VERSION_JSON" <<EOF
+{
+  "latestVersion": "$NEW_VER",
+  "latestVersionCode": $NEW_CODE,
+  "downloadUrl": "https://ai.nma-it.com/mediconnect.apk",
+  "releaseNotes": "",
+  "minimumVersion": "1.0.3"
+}
+EOF
+echo "   ✅ $VERSION_JSON updated"
+
 # ── Summary ──
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
