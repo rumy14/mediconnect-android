@@ -72,6 +72,11 @@ fun DoctorDetailScreen(navController: NavController) {
             TopAppBar(
                 title = { Text("Doctor Profile", fontWeight = FontWeight.Bold) },
                 navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
+                actions = {
+                    IconButton(onClick = { navController.navigate(Screen.Home.route) { popUpTo(0) { inclusive = true } } }) {
+                        Icon(Icons.Default.Home, contentDescription = "Home")
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         }

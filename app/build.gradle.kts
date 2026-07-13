@@ -13,11 +13,13 @@ android {
         applicationId = "com.mediconnect"
         minSdk = 26
         targetSdk = 35
-        versionCode = 5
+        versionCode = 6
         versionName = "1.0.4"
 
         // ✅ Live API server
         buildConfigField("String", "API_BASE_URL", "\"https://mediconnect.nma-it.com/api/\"")
+
+        buildConfigField("Long", "BUILD_EPOCH", "${System.currentTimeMillis()}L")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -40,6 +42,7 @@ android {
                 "proguard-rules.pro"
             )
             buildConfigField("String", "API_BASE_URL", "\"https://mediconnect.nma-it.com/api/\"")
+            buildConfigField("Long", "BUILD_EPOCH", "${System.currentTimeMillis()}L")
         }
     }
 

@@ -30,8 +30,16 @@ import androidx.navigation.NavController
 import com.mediconnect.data.api.MediConnectApi
 import com.mediconnect.data.model.LoginRequest
 import com.mediconnect.data.session.SessionManager
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
+import com.mediconnect.BuildConfig
 import com.mediconnect.navigation.Screen
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 // Custom colors for the dark teal theme
 private val TealStart = Color(0xFF0D4F4F)       // Dark teal top
@@ -57,7 +65,17 @@ fun LoginScreen(navController: NavController) {
     var password by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
-    var showAiVoice by remember { mutableStateOf(false) }
+
+    // Check if biometric hardware is available
+    val biometricAvailable = remember {
+        try {
+            val bm = BiometricManager.from(context)
+            @Suppress("DEPRECATION")
+            bm.canAuthenticate() == BiometricManager.BIOMETRIC_SUCCESS
+        } catch (_: Exception) {
+            false
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -274,7 +292,56 @@ fun LoginScreen(navController: NavController) {
                             Text("Sign In", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
                         }
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
+                    // Biometric login button (visible if hardware supports it)
+                    if (biometricAvailable) {
+                        OutlinedButton(
+                            onClick = {
+                                val activity = context as? FragmentActivity ?: return@OutlinedButton
+                                val prompt = BiometricPrompt(
+                                    activity,
+                                    ContextCompat.getMainExecutor(context),
+                                    object : BiometricPrompt.AuthenticationCallback() {
+                                        override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                                            scope.launch {
+                                                try {
+                                                    val token = session.getToken()
+                                                    if (!token.isNullOrBlank()) {
+                                                        api.setToken(token)
+                                                        navController.navigate(Screen.Home.route) {
+                                                            popUpTo(Screen.Login.route) { inclusive = true }
+                                                        }
+                                                    } else {
+                                                        errorMsg = "No saved session"
+                                                    }
+                                                } catch (_: Exception) {
+                                                    errorMsg = "Authentication failed"
+                                                }
+                                            }
+                                        }
+                                        override fun onAuthenticationError(errCode: Int, errString: CharSequence) {
+                                            if (errCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON) {
+                                                errorMsg = errString.toString()
+                                            }
+                                        }
+                                    }
+                                )
+                                prompt.authenticate(
+                                    BiometricPrompt.PromptInfo.Builder()
+                                        .setTitle("MediConnect")
+                                        .setSubtitle("Use fingerprint to sign in")
+                                        .setNegativeButtonText("Cancel")
+                                        .build()
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Biometric Sign In", fontSize = 14.sp)
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
 
                     // Register link
                     Row(
@@ -290,37 +357,41 @@ fun LoginScreen(navController: NavController) {
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(20.dp))
 
-                    // AI Voice Assistant pill button
-                    OutlinedButton(
-                        onClick = { showAiVoice = true },
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = PillBg,
-                            contentColor = Color.White
-                        ),
-                        border = BorderStroke(1.dp, GoldenOutline)
-                    ) {
-                        Text(text = "🎤", fontSize = 16.sp)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Talk to AI Assistant",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
                 }
+            }
+
+            Spacer(modifier = Modifier.height(40.dp))
+
+            // ── Version footer ──
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "MediConnect v${BuildConfig.VERSION_NAME}",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = White30,
+                    letterSpacing = 2.sp
+                )
+                val buildDate = remember {
+                    try {
+                        SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US)
+                            .format(Date(BuildConfig.BUILD_EPOCH))
+                    } catch (_: Exception) { "" }
+                }
+                Text(
+                    text = buildDate,
+                    fontSize = 9.sp,
+                    color = White30.copy(alpha = 0.5f),
+                    letterSpacing = 1.sp
+                )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
 
-    // AI Voice Call Dialog
-    VapiVoiceCallDialog(
-        show = showAiVoice,
-        onDismiss = { showAiVoice = false }
-    )
+
 }
