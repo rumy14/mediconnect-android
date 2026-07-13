@@ -11,15 +11,15 @@
 #
 # Output:
 #   - app/build/outputs/apk/release/app-release.apk
-#   → /var/www/html/mediconnect-v{version}.apk
-#   → /var/www/html/mediconnect.apk          (always-latest symlink/copy)
+#   → /var/www/ai-nma-it/mediconnect-v{version}.apk
+#   → /var/www/ai-nma-it/mediconnect.apk          (always-latest symlink/copy)
 #   - TOOLS.md is NOT auto-updated (manual after upload)
 # ────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GRADLE_FILE="$SCRIPT_DIR/app/build.gradle.kts"
-WEB_DIR="${WEB_DIR:-/var/www/html}"
+WEB_DIR="${WEB_DIR:-/var/www/ai-nma-it}"
 VERSION_REGEX='versionName\s*=\s*"([0-9]+\.[0-9]+\.[0-9]+)"'
 CODE_REGEX='versionCode\s*=\s*([0-9]+)'
 
