@@ -25,7 +25,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -43,6 +46,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.mediconnect.data.api.MediConnectApi
 import com.mediconnect.data.model.SaveVoiceCallRequest
+import com.mediconnect.data.model.VoiceCallResponse
 import com.mediconnect.data.model.VoiceCallTranscriptEntry
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -53,9 +57,6 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
-/**
- * VAPI Voice Assistant Configuration
- */
 object VapiConfig {
     const val PUBLIC_KEY = "903ffbab-e2a4-43de-9db6-772c9d2933f5"
     const val ASSISTANT_ID = "24b96fc8-1e80-4401-8e1f-480caec6b033"
@@ -63,10 +64,6 @@ object VapiConfig {
 
 /**
  * Fullscreen voice call dialog powered by VAPI.ai via WebView.
- * Shows when [show] is true; calls [onDismiss] when user closes.
- *
- * Captures transcript in real-time via JavascriptInterface and POSTs
- * the completed call data to the MediConnect API on call end.
  */
 @Composable
 fun VapiVoiceCallDialog(
@@ -78,7 +75,6 @@ fun VapiVoiceCallDialog(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    // —— Permission state ——
     var hasMicPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
@@ -92,19 +88,16 @@ fun VapiVoiceCallDialog(
         hasMicPermission = granted
     }
 
-    // Request permission on first show if not granted
     LaunchedEffect(Unit) {
         if (!hasMicPermission) {
             permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
 
-    // —— Audio manager (used for volume + loudspeaker) ——
     val audioManager = remember {
         context.getSystemService(android.content.Context.AUDIO_SERVICE) as? AudioManager
     }
 
-    // Volume button handler for the entire dialog surface.
     val handleVolumeKey: (androidx.compose.ui.input.key.KeyEvent) -> Boolean = volKey@ { ke ->
         if (ke.nativeKeyEvent.action != KeyEvent.ACTION_DOWN) return@volKey false
         when (ke.nativeKeyEvent.keyCode) {
@@ -128,7 +121,6 @@ fun VapiVoiceCallDialog(
         }
     }
 
-    // —— UI ——
     AnimatedVisibility(
         visible = show,
         enter = fadeIn(animationSpec = tween(durationMillis = 250)),
@@ -141,13 +133,11 @@ fun VapiVoiceCallDialog(
                 .onPreviewKeyEvent { handleVolumeKey(it) }
         ) {
             if (!hasMicPermission) {
-                // Permission not granted — show prompt
                 PermissionPrompt(
                     onRetry = { permissionLauncher.launch(Manifest.permission.RECORD_AUDIO) },
                     onDismiss = onDismiss
                 )
             } else {
-                // Voice call WebView with smooth end transition
                 VapiVoiceCallSurface(
                     onDismiss = onDismiss,
                     scope = scope
@@ -157,9 +147,6 @@ fun VapiVoiceCallDialog(
     }
 }
 
-/**
- * Shown when microphone permission is missing.
- */
 @Composable
 private fun PermissionPrompt(
     onRetry: () -> Unit,
@@ -203,9 +190,12 @@ private fun PermissionPrompt(
  * Lifecycle:
  *   1. WebView mounts and starts the VAPI call.
  *   2. Transcript entries are captured in real-time via [VoiceCallBridge].
- *   3. When the close button is tapped (or call ends), we signal VAPI to stop,
- *      POST the transcript to the API, and reveal an "end-of-call" overlay.
- *   4. After ~1.4s the overlay fades in, then onDismiss() runs.
+ *   3. Booking metadata is collected from the VAPI assistant's JavaScript bridge.
+ *   4. When the close button is tapped (or call ends), we:
+ *      a) Signal VAPI to stop
+ *      b) POST the transcript to the API (which auto-books if metadata present)
+ *      c) Show an end-of-call overlay with appointment confirmation if booked
+ *   5. After a brief pause, onDismiss() runs.
  */
 @Composable
 private fun VapiVoiceCallSurface(
@@ -218,7 +208,6 @@ private fun VapiVoiceCallSurface(
     }
     var webView by remember { mutableStateOf<WebView?>(null) }
 
-    // Pull the JWT and name from local session storage so VAPI tool calls can resolve the user.
     var userJwt by remember { mutableStateOf("") }
     var userName by remember { mutableStateOf("") }
     LaunchedEffect(Unit) {
@@ -226,25 +215,28 @@ private fun VapiVoiceCallSurface(
             val session = com.mediconnect.data.session.SessionManager.getInstance(context)
             userJwt = session.getToken().orEmpty()
             userName = session.userNameFlow.first().orEmpty()
-        } catch (_: Exception) { /* anonymous call (rare) */ }
+        } catch (_: Exception) { }
     }
 
-    // The closing overlay state
-    var endMessage by remember { mutableStateOf<String?>(null) }
-    // When user wants to close, set endMessage; after a moment, call onDismiss.
-    LaunchedEffect(endMessage) {
-        if (endMessage != null) {
-            delay(1400)
+    // ── End-of-call state ──
+    var endScreenState by remember { mutableStateOf<EndScreenState>(EndScreenState.Hidden) }
+    LaunchedEffect(endScreenState) {
+        if (endScreenState !is EndScreenState.Hidden) {
+            delay(2500)
             onDismiss()
         }
     }
 
-    // —— Transcript capture state ——
+    // ── Call tracking state ──
     val transcriptEntries = remember { mutableListOf<VoiceCallTranscriptEntry>() }
+    val bookingMetadata = remember { mutableMapOf<String, String>() }
     var callStartedAt by remember { mutableStateOf<Long>(SystemClock.elapsedRealtime()) }
     var callEnded by remember { mutableStateOf(false) }
+    var savedCallId by remember { mutableStateOf<String?>(null) }
+    var savedAppointmentInfo by remember { mutableStateOf<AppointmentInfo?>(null) }
+    var isSaving by remember { mutableStateOf(false) }
 
-    // —— Fetch doctors list and inject into WebView for VAPI assistant ——
+    // ── Fetch doctors list and inject into WebView for VAPI assistant ──
     LaunchedEffect(Unit) {
         try {
             val api = com.mediconnect.data.api.MediConnectApi.getInstance()
@@ -254,17 +246,15 @@ private fun VapiVoiceCallSurface(
                     "{\"firstName\":\"${doc.user.firstName}\",\"lastName\":\"${doc.user.lastName}\",\"specialties\":[${doc.specialties.joinToString(",") { "\"${it.specialty.name}\"" }}],\"fee\":\"${doc.consultationFee.toInt()}\"}"
                 }
                 val doctorsJson = "[$json]"
-                // Wait for WebView to be ready, then inject
                 kotlinx.coroutines.delay(1000)
                 webView?.evaluateJavascript("window.VapiBridge?.setDoctors('$doctorsJson');", null)
             }
         } catch (_: Exception) { }
     }
 
-    // —— Force loudspeaker (speakerphone) so the AI voice plays out loud, not the earpiece ——
+    // ── Force loudspeaker ──
     LaunchedEffect(Unit) {
         audioManager?.let { am ->
-            // Make media stream drive the volume for both incoming audio and our UI.
             am.mode = AudioManager.MODE_IN_COMMUNICATION
             am.isSpeakerphoneOn = true
         }
@@ -278,151 +268,190 @@ private fun VapiVoiceCallSurface(
         }
     }
 
-    /** Format an ISO-8601 timestamp for the current moment. */
     fun nowIso(): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
         sdf.timeZone = TimeZone.getTimeZone("UTC")
         return sdf.format(Date())
     }
 
-    /** Save the captured transcript to the API and return a status message. */
-    fun saveTranscript(): String {
-        if (transcriptEntries.isEmpty()) {
-            return "Call ended"
-        }
-
-        val endedAt = nowIso()
-        val durationMs = SystemClock.elapsedRealtime() - callStartedAt
-        val durationSec = (durationMs / 1000).toInt()
+    /**
+     * Save the transcript, optionally book from metadata, and update UI state.
+     * Runs in a coroutine scope.
+     */
+    fun endCallAndSave() {
+        if (isSaving) return
+        isSaving = true
 
         scope.launch {
             try {
                 val api = MediConnectApi.getInstance()
+                val endedAt = nowIso()
+                val durationMs = SystemClock.elapsedRealtime() - callStartedAt
+                val durationSec = (durationMs / 1000).toInt()
+
+                // Build metadata from bridge-collected data
+                val metadata = if (bookingMetadata.isNotEmpty()) {
+                    bookingMetadata.toMap()
+                } else null
+
                 val request = SaveVoiceCallRequest(
-                    status = "COMPLETED",
+                    status = if (transcriptEntries.isEmpty()) "INTERRUPTED" else "COMPLETED",
                     durationSeconds = durationSec,
                     startedAt = endedAt,
                     endedAt = endedAt,
-                    transcript = transcriptEntries.toList()
+                    transcript = transcriptEntries.toList(),
+                    metadata = metadata
                 )
+
                 val response = api.saveVoiceCall(request)
-                if (!response.success) {
-                    android.util.Log.w("VoiceCall", "Failed to save transcript: ${response.error}")
+
+                if (response.success && response.data != null) {
+                    savedCallId = response.data.id
+                    android.util.Log.i("VoiceCall", "Transcript saved: ${response.data.id}")
+
+                    // Check if auto-booking happened on the backend
+                    val data = response.data
+                    // The backend V1 response doesn't include appointmentBooked/appointment fields
+                    // But we can try to book explicitly if we have metadata
+                    if (bookingMetadata.containsKey("doctorId") &&
+                        bookingMetadata.containsKey("appointmentDate") &&
+                        bookingMetadata.containsKey("appointmentTime")) {
+
+                        try {
+                            val doctorId = bookingMetadata["doctorId"]!!
+                            val apptDate = bookingMetadata["appointmentDate"]!!
+                            val apptTime = bookingMetadata["appointmentTime"]!!
+                            val reason = bookingMetadata["reason"] ?: "Booked via voice AI assistant"
+
+                            val bookResponse = api.bookVoiceCall(
+                                callId = response.data.id,
+                                doctorId = doctorId,
+                                appointmentDate = apptDate,
+                                startTime = apptTime,
+                                reason = reason
+                            )
+
+                            if (bookResponse.success && bookResponse.data != null) {
+                                val appointment = bookResponse.data.appointment
+                                savedAppointmentInfo = AppointmentInfo(
+                                    id = appointment.id,
+                                    doctorName = "${appointment.doctor.user.firstName} ${appointment.doctor.user.lastName}",
+                                    date = appointment.appointmentDate,
+                                    time = appointment.startTime,
+                                    status = appointment.status
+                                )
+                                android.util.Log.i("VoiceCall", "Appointment auto-booked: ${appointment.id}")
+                            }
+                        } catch (e: Exception) {
+                            android.util.Log.w("VoiceCall", "Auto-book failed (may already be booked by backend): ${e.message}")
+                        }
+                    }
+
+                    // Show appropriate end screen
+                    endScreenState = if (savedAppointmentInfo != null) {
+                        EndScreenState.AppointmentBooked(
+                            savedAppointmentInfo!!,
+                            durationSec
+                        )
+                    } else {
+                        EndScreenState.CallEnded(durationSec)
+                    }
                 } else {
-                    android.util.Log.i("VoiceCall", "Transcript saved: ${response.data?.id}")
+                    android.util.Log.w("VoiceCall", "Failed to save: ${response.error}")
+                    endScreenState = EndScreenState.Error(response.error ?: "Failed to save call")
                 }
             } catch (e: Exception) {
-                android.util.Log.e("VoiceCall", "Error saving transcript", e)
+                android.util.Log.e("VoiceCall", "Error ending call", e)
+                endScreenState = EndScreenState.Error(e.message ?: "Unknown error")
+            } finally {
+                isSaving = false
             }
         }
-        return "Call ended"
     }
 
     val handleClose: () -> Unit = {
         if (!callEnded) {
             callEnded = true
-            // Stop the VAPI call cleanly
             webView?.evaluateJavascript("window.VapiBridge?.end();", null)
-            // Save the transcript
-            endMessage = saveTranscript()
+            endCallAndSave()
         }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // —— WebView (always present underneath) ——
+        // ── WebView ──
         VoiceCallWebView(
             audioManager = audioManager,
             userJwt = userJwt,
             userName = userName,
             transcriptEntries = transcriptEntries,
+            bookingMetadata = bookingMetadata,
             onWebViewReady = { webView = it },
             onCallEndedExternally = {
                 if (!callEnded) {
                     callEnded = true
-                    endMessage = saveTranscript()
+                    endCallAndSave()
                 }
             }
         )
 
-        // —— Closing overlay with smooth fade ——
+        // ── End screen overlay ──
         AnimatedVisibility(
-            visible = endMessage != null,
+            visible = endScreenState !is EndScreenState.Hidden,
             enter = fadeIn(animationSpec = tween(durationMillis = 350)),
             exit = fadeOut(animationSpec = tween(durationMillis = 200)),
             modifier = Modifier.fillMaxSize()
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0xFF050608)),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Filled.Close,
-                        contentDescription = null,
-                        tint = Color.White.copy(alpha = 0.7f),
-                        modifier = Modifier.size(48.dp)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = endMessage ?: "",
-                        color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "Saving transcript…",
-                        color = Color.White.copy(alpha = 0.5f),
-                        fontSize = 13.sp
-                    )
-                }
+            when (val state = endScreenState) {
+                is EndScreenState.AppointmentBooked -> AppointmentConfirmationOverlay(state)
+                is EndScreenState.CallEnded -> CallEndedOverlay(state)
+                is EndScreenState.Error -> ErrorOverlay(state)
+                else -> {}
             }
         }
 
-        // —— Top bar: title + a clean, large close icon ——
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 20.dp, end = 16.dp, top = 24.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF22C55E))
-                        .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("🎤", fontSize = 16.sp)
-                }
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    "MediConnect AI",
-                    color = Color.White,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 16.sp
-                )
-            }
-            Spacer(modifier = Modifier.weight(1f))
-            // Clear, prominent close button — circular surface, proper Close icon.
-            Surface(
-                onClick = handleClose,
-                shape = CircleShape,
-                color = Color.White.copy(alpha = 0.14f),
-                contentColor = Color.White,
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
-                modifier = Modifier.size(44.dp)
+        // ── Top bar ──
+        if (endScreenState is EndScreenState.Hidden) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 20.dp, end = 16.dp, top = 24.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Filled.Close,
-                        contentDescription = "End call",
-                        modifier = Modifier.size(22.dp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF22C55E))
+                            .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("🎤", fontSize = 16.sp)
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        "MediConnect AI",
+                        color = Color.White,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 16.sp
                     )
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                Surface(
+                    onClick = handleClose,
+                    shape = CircleShape,
+                    color = Color.White.copy(alpha = 0.14f),
+                    contentColor = Color.White,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = "End call",
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                 }
             }
         }
@@ -430,20 +459,185 @@ private fun VapiVoiceCallSurface(
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-//  JavascriptInterface — bridges transcript data from WebView JS to Kotlin
+//  End Screen States
 // ────────────────────────────────────────────────────────────────────────────
 
-/**
- * Bridge object exposed to the WebView JavaScript via [WebView.addJavascriptInterface].
- *
- * The JS side calls:
- *   AndroidBridge.onTranscript(role, text, timestamp, transcriptType)
- *   AndroidBridge.onCallEnded()
- *
- * All arguments are passed as JSON strings for safety across the bridge boundary.
- */
+data class AppointmentInfo(
+    val id: String,
+    val doctorName: String,
+    val date: String,
+    val time: String,
+    val status: String
+)
+
+sealed class EndScreenState {
+    data object Hidden : EndScreenState()
+    data class CallEnded(val durationSeconds: Int) : EndScreenState()
+    data class AppointmentBooked(val appointment: AppointmentInfo, val durationSeconds: Int) : EndScreenState()
+    data class Error(val message: String) : EndScreenState()
+}
+
+@Composable
+private fun CallEndedOverlay(state: EndScreenState.CallEnded) {
+    Box(
+        modifier = Modifier.fillMaxSize().background(Color(0xFF050608)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                imageVector = Icons.Filled.Close,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.7f),
+                modifier = Modifier.size(48.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Call ended",
+                color = Color.White,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            val durationStr = if (state.durationSeconds < 60) {
+                "${state.durationSeconds}s"
+            } else {
+                "${state.durationSeconds / 60}m ${state.durationSeconds % 60}s"
+            }
+            Text(
+                text = "Duration: $durationStr",
+                color = Color.White.copy(alpha = 0.5f),
+                fontSize = 14.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun AppointmentConfirmationOverlay(state: EndScreenState.AppointmentBooked) {
+    val appt = state.appointment
+
+    // Format the date nicely
+    val formattedDate = try {
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val date = sdf.parse(appt.date.split("T")[0])
+        val outFmt = SimpleDateFormat("EEEE, MMMM d, yyyy", Locale.US)
+        outFmt.format(date!!)
+    } catch (_: Exception) {
+        appt.date
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF050608)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(32.dp)
+        ) {
+            // Success icon with green check
+            Icon(
+                imageVector = Icons.Filled.CheckCircle,
+                contentDescription = "Appointment booked",
+                tint = Color(0xFF22C55E),
+                modifier = Modifier.size(64.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Appointment Booked!",
+                color = Color.White,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Your AI assistant has booked an appointment for you.",
+                color = Color.White.copy(alpha = 0.7f),
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Appointment details card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0f172a))
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    DetailRow("Doctor", "Dr. ${appt.doctorName}")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    DetailRow("Date", formattedDate)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    DetailRow("Time", appt.time)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    DetailRow("Status", appt.status.replace("_", " "))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            val durationStr = if (state.durationSeconds < 60) {
+                "${state.durationSeconds}s"
+            } else {
+                "${state.durationSeconds / 60}m ${state.durationSeconds % 60}s"
+            }
+            Text(
+                text = "Call duration: $durationStr",
+                color = Color.White.copy(alpha = 0.4f),
+                fontSize = 12.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun DetailRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = label,
+            color = Color.White.copy(alpha = 0.5f),
+            fontSize = 14.sp
+        )
+        Text(
+            text = value,
+            color = Color.White,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
+
+@Composable
+private fun ErrorOverlay(state: EndScreenState.Error) {
+    Box(
+        modifier = Modifier.fillMaxSize().background(Color(0xFF050608)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
+            Text("⚠️", fontSize = 40.sp)
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = state.message,
+                color = Color.White,
+                fontSize = 16.sp,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+//  JavascriptInterface — bridges transcript + metadata from WebView JS to Kotlin
+// ────────────────────────────────────────────────────────────────────────────
+
 class VoiceCallBridge(
     private val transcriptEntries: MutableList<VoiceCallTranscriptEntry>,
+    private val bookingMetadata: MutableMap<String, String>,
     private val onCallEnded: () -> Unit
 ) {
     @JavascriptInterface
@@ -461,23 +655,28 @@ class VoiceCallBridge(
     fun onCallEnded() {
         onCallEnded()
     }
+
+    /**
+     * Receives booking metadata from the VAPI assistant JavaScript bridge.
+     * Called from JS like: AndroidBridge.onMetadata("doctorId", "abc123")
+     */
+    @JavascriptInterface
+    fun onMetadata(key: String, value: String) {
+        if (key.isNotBlank() && value.isNotBlank()) {
+            bookingMetadata[key] = value
+        }
+    }
 }
 
 // ────────────────────────────────────────────────────────────────────────────
 
-/**
- * The WebView that loads vapi_voice.html.
- *
- * - Reports the WebView upward so the parent can call end() on close.
- * - Reports when the server-side call ends so we can show the closing overlay.
- * - Bridges transcript data to Kotlin via [VoiceCallBridge].
- */
 @Composable
 private fun VoiceCallWebView(
     audioManager: AudioManager?,
     userJwt: String,
     userName: String,
     transcriptEntries: MutableList<VoiceCallTranscriptEntry>,
+    bookingMetadata: MutableMap<String, String>,
     onWebViewReady: (WebView) -> Unit,
     onCallEndedExternally: () -> Unit
 ) {
@@ -485,7 +684,6 @@ private fun VoiceCallWebView(
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    // Auto-dismiss error after 20s timeout if nothing connected
     LaunchedEffect(Unit) {
         delay(20_000)
         if (isLoading && errorMessage == null) {
@@ -494,7 +692,6 @@ private fun VoiceCallWebView(
         }
     }
 
-    // Load the HTML content with key/assistant/user injected (doctors fetched separately)
     val htmlContent = remember(userJwt, userName) {
         try {
             val inputStream: InputStream = context.assets.open("vapi_voice.html")
@@ -511,7 +708,6 @@ private fun VoiceCallWebView(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // —— WebView ——
         AndroidView(
             factory = { ctx ->
                 WebView(ctx).apply {
@@ -546,7 +742,6 @@ private fun VoiceCallWebView(
                             request: WebResourceRequest?,
                             error: WebResourceError?
                         ) {
-                            // Only show error for MAIN page failure, not sub-resources (fonts, icons, etc.)
                             if (request?.isForMainFrame == true) {
                                 val desc = if (Build.VERSION.SDK_INT >= 23) {
                                     error?.description?.toString() ?: "Unknown"
@@ -561,19 +756,15 @@ private fun VoiceCallWebView(
 
                     webChromeClient = object : WebChromeClient() {
                         override fun onPermissionRequest(request: PermissionRequest) {
-                            // Automatically grant microphone permission in WebView
-                            // (we already have the Android-level permission)
                             if (request.origin != null) {
                                 request.grant(request.resources)
                             }
                         }
                     }
 
-                    // —— Add the JavaScript bridge for transcript capture ——
-                    val bridge = VoiceCallBridge(transcriptEntries, onCallEndedExternally)
+                    val bridge = VoiceCallBridge(transcriptEntries, bookingMetadata, onCallEndedExternally)
                     addJavascriptInterface(bridge, "AndroidBridge")
 
-                    // Load the HTML
                     htmlContent?.let { data ->
                         loadDataWithBaseURL("https://mediconnect.nma-it.com/api/", data, "text/html", "UTF-8", null)
                     } ?: run {
@@ -584,10 +775,9 @@ private fun VoiceCallWebView(
                 }
             },
             modifier = Modifier.fillMaxSize(),
-            update = { /* no-op after init */ }
+            update = { }
         )
 
-        // —— Loading overlay ——
         if (isLoading) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -605,7 +795,6 @@ private fun VoiceCallWebView(
             }
         }
 
-        // —— Error state ——
         errorMessage?.let { error ->
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -631,11 +820,6 @@ private fun VoiceCallWebView(
     }
 }
 
-/**
- * Escape a string so it can safely be inlined inside a JS string literal.
- * Backslashes, quotes and newlines are sanitised so an attacker-controlled
- * user name can't break out of the literal.
- */
 private fun String.escapeJsString(): String =
     this.replace("\\", "\\\\")
         .replace("'", "\\'")

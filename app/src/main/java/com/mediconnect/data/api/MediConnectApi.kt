@@ -156,6 +156,57 @@ class MediConnectApi private constructor() {
     suspend fun deleteVoiceCall(id: String): ApiResponse<Unit> =
         client.delete("vapi/calls/$id") { withAuth() }.body()
 
+    // ── Voice Call Booking ──
+
+    /**
+     * Book an appointment from a voice call's booking metadata.
+     */
+    suspend fun bookVoiceCall(
+        callId: String,
+        doctorId: String,
+        appointmentDate: String,
+        startTime: String,
+        reason: String? = null
+    ): ApiResponse<BookVoiceCallResponse> =
+        client.post("vapi/calls/$callId/book") {
+            withAuth()
+            setBody(BookVoiceCallRequest(doctorId, appointmentDate, startTime, reason))
+        }.body()
+
+    /**
+     * Send a voice call transcript via email.
+     */
+    suspend fun sendEmailTranscript(
+        callId: String,
+        email: String
+    ): ApiResponse<EmailSentResponse> =
+        client.post("vapi/calls/$callId/email") {
+            withAuth()
+            setBody(EmailTranscriptRequest(email))
+        }.body()
+
+    /**
+     * Initiate an outbound VAPI call.
+     */
+    suspend fun outboundCall(
+        phoneNumber: String,
+        doctorId: String? = null
+    ): ApiResponse<OutboundCallResponse> =
+        client.post("vapi/calls/outbound") {
+            withAuth()
+            setBody(OutboundCallRequest(phoneNumber, doctorId))
+        }.body()
+
+    /**
+     * Send an appointment reminder email.
+     */
+    suspend fun sendAppointmentReminder(
+        appointmentId: String
+    ): ApiResponse<EmailSentResponse> =
+        client.post("appointments/$appointmentId/send-reminder") {
+            withAuth()
+        }.body()
+
     // ── Version Check (unofficial — fetches from web root, not API) ──
 
     @Serializable

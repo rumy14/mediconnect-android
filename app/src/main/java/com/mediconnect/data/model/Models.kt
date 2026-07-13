@@ -287,3 +287,53 @@ data class DoctorDetailInfo(
     val user: UserNameWithEmail,
     val specialties: List<DoctorSpecialtyInfo>
 )
+
+// ── Voice Call Booking (new) ──
+
+@Serializable
+data class BookVoiceCallRequest(
+    val doctorId: String,
+    @SerialName("appointment_date")
+    val appointmentDate: String,
+    @SerialName("start_time")
+    val startTime: String,
+    val reason: String? = null
+)
+
+@Serializable
+data class BookVoiceCallResponse(
+    val appointment: AppointmentDetail,
+    @SerialName("voice_call_id")
+    val voiceCallId: String? = null
+)
+
+@Serializable
+data class OutboundCallRequest(
+    @SerialName("phone_number")
+    val phoneNumber: String,
+    @SerialName("doctor_id")
+    val doctorId: String? = null
+)
+
+@Serializable
+data class OutboundCallResponse(
+    @SerialName("call_id")
+    val callId: String? = null,
+    @SerialName("vapi_call_id")
+    val vapiCallId: String? = null,
+    @SerialName("phone_number")
+    val phoneNumber: String? = null,
+    val status: String? = null,
+    val note: String? = null
+)
+
+@Serializable
+data class EmailTranscriptRequest(
+    val email: String
+)
+
+@Serializable
+data class EmailSentResponse(
+    val sent: Boolean = false,
+    val to: String? = null
+)
