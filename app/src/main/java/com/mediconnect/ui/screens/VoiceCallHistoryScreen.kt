@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -68,8 +69,15 @@ fun VoiceCallHistoryScreen(navController: NavController) {
                     titleContentColor = MaterialTheme.colorScheme.onSurface
                 ),
                 navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    IconButton(onClick = {
+                        val popped = navController.popBackStack()
+                        if (!popped) {
+                            navController.navigate(Screen.Home.route) {
+                                popUpTo(Screen.Home.route) { inclusive = true }
+                            }
+                        }
+                    }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
@@ -154,6 +162,10 @@ fun VoiceCallHistoryScreen(navController: NavController) {
 
 @Composable
 private fun VoiceCallCard(call: VoiceCallSummary, onClick: () -> Unit) {
+    val doctorName = extractDoctorName(call.metadata)
+    val dateText = call.endedAt?.let { formatVoiceCallDate(it) } ?: ""
+    val title = if (doctorName != null) doctorName else (call.summary ?: call.transcriptPreview ?: "Voice call")
+
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
@@ -182,21 +194,24 @@ private fun VoiceCallCard(call: VoiceCallSummary, onClick: () -> Unit) {
             Spacer(modifier = Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                // Summary or preview
+                // Doctor name (or summary as title)
                 Text(
-                    text = call.summary ?: call.transcriptPreview ?: "Voice call",
+                    text = title,
                     fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = call.startedAt?.let { formatCallDate(it) } ?: "",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    // Formatted date from endedAt
+                    if (dateText.isNotEmpty()) {
+                        Text(
+                            text = dateText,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     if (call.durationSeconds != null) {
                         Text(
                             text = " · ${formatDuration(call.durationSeconds)}",
@@ -221,6 +236,46 @@ private fun VoiceCallCard(call: VoiceCallSummary, onClick: () -> Unit) {
                 modifier = Modifier.size(20.dp)
             )
         }
+    }
+}
+
+/** Extract the doctor name from voice call metadata, if available. */
+private fun extractDoctorName(metadata: Map<String, String>?): String? {
+    if (metadata == null) return null
+    val name = metadata["doctorName"]
+    if (!name.isNullOrBlank()) return name
+    // Also check "doctor_name" as alternative key
+    val alt = metadata["doctor_name"]
+    if (!alt.isNullOrBlank()) return alt
+    return null
+}
+
+/** Format ISO date string to "15th July/26" format using endedAt timestamp. */
+private fun formatVoiceCallDate(isoDate: String): String {
+    return try {
+        val sdfIn = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
+        sdfIn.timeZone = java.util.TimeZone.getTimeZone("UTC")
+        val date = sdfIn.parse(isoDate.replace(Regex("\\.[0-9]+Z$"), "").replace("Z", ""))
+            ?: return isoDate.take(10)
+        val cal = java.util.Calendar.getInstance()
+        cal.time = date
+        val day = cal.get(java.util.Calendar.DAY_OF_MONTH)
+        val monthNames = arrayOf(
+            "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December"
+        )
+        val month = monthNames[cal.get(java.util.Calendar.MONTH)]
+        val yearShort = cal.get(java.util.Calendar.YEAR) % 100
+        val suffix = when {
+            day % 100 in 11..13 -> "th"
+            day % 10 == 1 -> "st"
+            day % 10 == 2 -> "nd"
+            day % 10 == 3 -> "rd"
+            else -> "th"
+        }
+        "${day}$suffix $month/$yearShort"
+    } catch (_: Exception) {
+        isoDate.take(10)
     }
 }
 

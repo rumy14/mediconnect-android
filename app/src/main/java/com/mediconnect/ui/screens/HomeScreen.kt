@@ -204,7 +204,15 @@ fun HomeScreen(navController: NavController) {
     // ── AI Voice Assistant ──
     VapiVoiceCallDialog(
         show = showAiVoice,
-        onDismiss = { showAiVoice = false }
+        onDismiss = { showAiVoice = false },
+        onAppointmentBooked = {
+            // Navigate to appointments after successful voice booking
+            showAiVoice = false
+            navController.navigate(Screen.Appointments.route) {
+                launchSingleTop = true
+                popUpTo(Screen.Home.route) { saveState = true }
+            }
+        }
     )
 }
 

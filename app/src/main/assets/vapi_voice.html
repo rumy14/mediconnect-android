@@ -3,437 +3,526 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>MediConnect AI</title>
+<title>VC Engine</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body {
-    width: 100%; height: 100%;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #0a0a0f;
-    color: #fff;
-    overflow: hidden;
-    user-select: none;
-    -webkit-user-select: none;
-  }
-  body {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    padding-top: 72px; /* skip past Android-side title bar */
-  }
-
-  /* ── Timer bar ── */
-  .timer-bar {
-    flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 8px 16px;
-    background: rgba(10,10,15,0.92);
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-    font-size: 12px;
-    color: rgba(255,255,255,0.5);
-    min-height: 34px;
-  }
-  .timer-bar .live-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: #22c55e;
-    animation: dot-pulse 1.5s ease-in-out infinite;
-  }
-  @keyframes dot-pulse {
-    0%, 100% { opacity: 0.4; }
-    50% { opacity: 1; }
-  }
-  .timer-bar .timer-text {
-    font-variant-numeric: tabular-nums;
-    font-weight: 600;
-    color: rgba(255,255,255,0.7);
-    font-size: 14px;
-  }
-
-  .mic-area {
-    flex: 0 0 auto;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 8px 20px 4px;
-  }
-
-  .mic-circle {
-    width: 80px; height: 80px;
-    border-radius: 50%;
-    background: #475569;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 32px;
-    transition: all 0.3s ease;
-    position: relative;
-  }
-  .mic-circle .ring {
-    position: absolute; inset: -5px;
-    border-radius: 50%;
-    border: 2px solid transparent;
-    opacity: 0;
-    transition: all 0.4s ease;
-  }
-  .mic-circle.listening { background: #22c55e; }
-  .mic-circle.listening .ring { border-color: rgba(34,197,94,0.3); opacity: 1; animation: ring-pulse 2s ease-in-out infinite; }
-  .mic-circle.speaking { background: #3b82f6; }
-  .mic-circle.speaking .ring { border-color: rgba(59,130,246,0.3); opacity: 1; animation: ring-pulse-blue 2s ease-in-out infinite; }
-  .mic-circle.thinking { background: #a855f7; }
-  .mic-circle.thinking .ring { border-color: rgba(168,85,247,0.3); opacity: 1; animation: ring-pulse-purple 1.2s ease-in-out infinite; }
-
-  @keyframes ring-pulse { 0% { transform: scale(1); opacity: 0.4; } 50% { transform: scale(1.12); opacity: 0.1; } 100% { transform: scale(1); opacity: 0.4; } }
-  @keyframes ring-pulse-blue { 0% { transform: scale(1); opacity: 0.4; } 50% { transform: scale(1.12); opacity: 0.1; } 100% { transform: scale(1); opacity: 0.4; } }
-  @keyframes ring-pulse-purple { 0% { transform: scale(1); opacity: 0.4; } 50% { transform: scale(1.15); opacity: 0.05; } 100% { transform: scale(1); opacity: 0.4; } }
-
-  .status-text { font-size: 15px; font-weight: 600; margin-top: 8px; color: #fff; min-height: 20px; text-align: center; }
-  .sub-status { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 3px; min-height: 16px; text-align: center; }
-
-  .transcript-window {
-    flex: 1 1 auto;
-    min-height: 0;
-    margin: 6px 12px 8px;
-    background: rgba(255,255,255,0.035);
-    border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 14px;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    scroll-behavior: smooth;
-    padding: 10px 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    transition: border-color 0.3s;
-  }
-  .transcript-window.active { border-color: rgba(34,197,94,0.18); }
-  .transcript-window::-webkit-scrollbar { width: 3px; }
-  .transcript-window::-webkit-scrollbar-track { background: transparent; }
-  .transcript-window::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
-
-  .transcript-empty { color: rgba(255,255,255,0.3); font-size: 13px; text-align: center; margin: auto 0; }
-
-  .chat-bubble {
-    max-width: 88%;
-    padding: 8px 12px;
-    border-radius: 16px;
-    font-size: 14px;
-    line-height: 1.4;
-    word-wrap: break-word;
-    animation: bubble-in 0.25s ease-out;
-    opacity: 0;
-    transform: translateY(6px);
-    animation-fill-mode: forwards;
-  }
-  @keyframes bubble-in { to { opacity: 1; transform: translateY(0); } }
-  .chat-bubble.user { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; margin-left: auto; border-bottom-right-radius: 6px; }
-  .chat-bubble.assistant { background: rgba(255,255,255,0.07); color: #e2e8f0; margin-right: auto; border-bottom-left-radius: 6px; border: 1px solid rgba(255,255,255,0.05); }
-
-  .live-interim {
-    align-self: flex-start; max-width: 88%; padding: 6px 10px;
-    border-radius: 14px; background: rgba(34,197,94,0.08);
-    border: 1px dashed rgba(34,197,94,0.2);
-    color: rgba(255,255,255,0.45); font-size: 13px; font-style: italic;
-    animation: fade-in 0.2s ease-out;
-  }
-  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-
-  .booking-overlay {
-    display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    background: #0a0a0f; z-index: 100;
-    flex-direction: column; align-items: center; justify-content: center;
-    padding: 32px; animation: overlay-in 0.4s ease-out;
-  }
-  .booking-overlay.show { display: flex; }
-  @keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
-  .booking-card { background: #0f172a; border: 1px solid rgba(34,197,94,0.15); border-radius: 20px; padding: 28px 24px; width: 100%; max-width: 340px; text-align: center; animation: card-pop 0.5s ease-out 0.1s both; }
-  @keyframes card-pop { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-  .booking-check { font-size: 48px; margin-bottom: 8px; }
-  .booking-title { font-size: 20px; font-weight: 700; margin-bottom: 2px; }
-  .booking-sub { font-size: 13px; color: #64748b; margin-bottom: 16px; }
-  .booking-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #1e293b; font-size: 13px; }
-  .booking-label { color: #64748b; }
-  .booking-value { color: #f1f5f9; font-weight: 600; }
-  .booking-close { margin-top: 16px; background: #1e293b; border: none; color: #94a3b8; padding: 10px 24px; border-radius: 12px; font-size: 14px; cursor: pointer; }
-  .booking-close:active { background: #334155; }
+  html, body { width: 100%; height: 100%; margin: 0; padding: 0; background: transparent; overflow: hidden; }
 </style>
+<script type="importmap">
+{ "imports": { "@vapi-ai/web": "https://esm.sh/@vapi-ai/web@latest" } }
+</script>
+<script type="module">
+import Vapi from '@vapi-ai/web';
+
+const ASSISTANT_ID = '__ASSISTANT_ID__';
+const PUBLIC_KEY = '__PUBLIC_KEY__';
+let USER_JWT = '__USER_JWT__';
+let USER_NAME = '__USER_NAME__';
+
+// Engine state
+let vapi = null;
+let connected = false;
+let endTriggered = false;
+let bookingSent = false;
+let callStartTime = null;
+let timerInterval = null;
+
+// Context
+let assistantContext = [];
+let userContext = [];
+let extractedFields = { doctorId: null, doctorName: null, date: null, time: null, reason: null };
+let lastUserSpeechTime = Date.now();
+let inactivityCheckId = null;
+let bookingEndTimeoutId = null;
+
+const API_BASE = '__API_BASE__';
+let availableDoctors = [];
+
+// ── Comprehensive end-call patterns ──
+const END_CALL_PATTERNS = [
+  // Direct goodbyes
+  /\bgoodbye\b/i, /\bbye[\s.!]/i, /\bbye-bye\b/i,
+  /\btake care\b/i, /\bsee you\b/i, /\bsee ya\b/i,
+  /\bhave a great (?:day|weekend|evening|afternoon|night|morning|week)\b/i,
+  /\bhave a wonderful\b/i, /\bstay safe\b/i,
+  /\bnice talking to you\b/i, /\bnice chatting\b/i,
+  /\bgreat talking\b/i,
+  /\bspeak (?:to you|again|soon) (?:soon|later|again)\b/i,
+  /\btalk (?:to you|again|soon) (?:soon|later|again)\b/i,
+  // Direct end-call phrases
+  /\bend(?:ing)? the call\b/i, /\bdrop(?:ping)? the call\b/i,
+  /\bhang(?:ing)? up\b/i, /\bending (?:this|our) conversation\b/i,
+  // Agent-led closing
+  /i(?:'ll| will) (?:end|drop|hang up|let you go)\b/i,
+  /i(?:'ve| have) (?:to )?(?:end|drop|let you go)\b/i,
+  /let me (?:end|hang up|disconnect)\b/i,
+  // Thank you + closing
+  /\bthank you (?:for (?:calling|chatting|your time|reaching out))\b.*\b(?:bye|goodbye|have a great)\b/i,
+  /(?:bye|goodbye).*\bthank you\b/i,
+  // Post-booking confirmation wrap-up  
+  /(?:is all set|all taken care of|everything is set).*\b(?:anything else|else can I)\b/i,
+  /is there anything else (?:I can |else I can )?help you with/i,
+  // Multi-phrase closers
+  /(?:thank you|thanks).*(?:goodbye|bye|have a good)/i,
+];
+
+// ── Booking confirmation patterns ──
+const BOOKING_CONFIRM_PATTERNS = [
+  /appointment (?:has been )?(?:booked|confirmed|scheduled|set|created|reserved)/i,
+  /(?:booked|confirmed|scheduled|set|created|reserved) your appointment/i,
+  /your appointment (?:is|has been) (?:booked|confirmed|scheduled)/i,
+  /i(?:'ve| have) (?:booked|scheduled|confirmed|set up|created|reserved) (?:your |an )?appointment/i,
+  /you'?re all set\b/i,
+  /all set (?:for|with)\b/i,
+  /confirmed for\b/i,
+  /you'?re scheduled\b/i,
+  /i'?ll (?:see you|send you|email you)\b/i,
+  /i'?ve gone ahead and\b.*(?:booked|scheduled|set)/i,
+];
+
+// ── Wake up the Kotlin side ──
+function notifyState(type, data) {
+  try {
+    if (window.AndroidBridge) {
+      window.AndroidBridge.onEngineState(type, data ? JSON.stringify(data) : '');
+    }
+  } catch(e) {}
+}
+
+function notifyTranscript(role, text) {
+  try {
+    if (window.AndroidBridge) {
+      window.AndroidBridge.onTranscript(role, text, new Date().toISOString(), 'final');
+    }
+  } catch(e) {}
+}
+
+function notifyMetadata(key, value) {
+  try {
+    if (window.AndroidBridge) {
+      window.AndroidBridge.onMetadata(key, value);
+    }
+  } catch(e) {}
+}
+
+function notifyBookingDone(info) {
+  try {
+    if (window.AndroidBridge) {
+      window.AndroidBridge.onBookingComplete(info ? JSON.stringify(info) : '');
+    }
+  } catch(e) {}
+}
+
+function notifyCallEnded() {
+  try {
+    if (window.AndroidBridge) {
+      window.AndroidBridge.onCallEnded();
+    }
+  } catch(e) {}
+}
+
+// ── Inactivity monitor ──
+function startInactivityMonitor() {
+  if (inactivityCheckId) clearInterval(inactivityCheckId);
+  inactivityCheckId = setInterval(() => {
+    if (!connected || endTriggered) {
+      clearInterval(inactivityCheckId);
+      inactivityCheckId = null;
+      return;
+    }
+    // If booking was sent and user hasn't spoken in 12s → auto-end
+    if (bookingSent) {
+      const idle = (Date.now() - lastUserSpeechTime) / 1000;
+      if (idle > 12) {
+        console.log('Inactivity timeout after booking: ' + Math.round(idle) + 's idle');
+        clearInterval(inactivityCheckId);
+        inactivityCheckId = null;
+        scheduleEnd(1000);
+      }
+    }
+  }, 2000);
+}
+
+// ── Schedule end with a delay (cancellable) ──
+function scheduleEnd(delayMs) {
+  if (endTriggered) return;
+  endTriggered = true;
+  if (bookingEndTimeoutId) clearTimeout(bookingEndTimeoutId);
+  if (inactivityCheckId) { clearInterval(inactivityCheckId); inactivityCheckId = null; }
+  console.log('Scheduling call end in ' + delayMs + 'ms');
+  setTimeout(() => { end(); }, delayMs);
+}
+
+// ── Quick ending for no-booking calls ──
+function scheduleEndQuick() {
+  scheduleEnd(1500);
+}
+
+// ── Post-booking end ──
+function scheduleEndAfterBooking() {
+  // When booking is confirmed, send notification and auto-end after short delay
+  if (bookingEndTimeoutId) clearTimeout(bookingEndTimeoutId);
+  bookingEndTimeoutId = setTimeout(() => {
+    if (!endTriggered) {
+      notifyState('booking_ready', extractedFields);
+      scheduleEnd(500);
+    }
+  }, 2000);
+}
+
+// ── Flush accumulated booking data to Android ──
+function flushBooking(context) {
+  const ctx = context || [...assistantContext, ...userContext].join(' ');
+  const doctor = findDoctor(ctx);
+  const dateStr = extractDate(ctx);
+  const timeStr = extractTime(ctx);
+
+  if (doctor) {
+    extractedFields.doctorId = doctor.id;
+    extractedFields.doctorName = (doctor.firstName + ' ' + doctor.lastName).trim();
+  }
+  if (dateStr) extractedFields.date = dateStr;
+  if (timeStr) extractedFields.time = timeStr;
+
+  if (extractedFields.doctorName || extractedFields.date || extractedFields.time) {
+    if (extractedFields.doctorId) notifyMetadata('doctorId', extractedFields.doctorId);
+    if (extractedFields.doctorName) notifyMetadata('doctorName', extractedFields.doctorName);
+    if (extractedFields.date) notifyMetadata('appointmentDate', extractedFields.date);
+    if (extractedFields.time) notifyMetadata('appointmentTime', extractedFields.time);
+    notifyMetadata('reason', extractedFields.reason || 'Booked via voice AI assistant');
+    bookingSent = true;
+    return true;
+  }
+  return false;
+}
+
+// ── Add a message bubble (transcript tracking only, no UI) ──
+function addBubble(role, text) {
+  if (!text) return;
+
+  // Push transcript to Android for storage
+  notifyTranscript(role, text);
+
+  // Context tracking
+  if (role === 'assistant') {
+    assistantContext.push(text);
+    if (assistantContext.length > 10) assistantContext.shift();
+  } else {
+    userContext.push(text);
+    if (userContext.length > 5) userContext.shift();
+    lastUserSpeechTime = Date.now();
+  }
+
+  const combinedContext = [...assistantContext, ...userContext].join(' ');
+
+  // ── Book appointment detection (extract from every message) ──
+  if (!bookingSent) {
+    const doctor = findDoctor(combinedContext);
+    const dateStr = extractDate(combinedContext);
+    const timeStr = extractTime(combinedContext);
+
+    if (doctor) {
+      extractedFields.doctorId = doctor.id;
+      extractedFields.doctorName = (doctor.firstName + ' ' + doctor.lastName).trim();
+    }
+    if (dateStr) extractedFields.date = dateStr;
+    if (timeStr) extractedFields.time = timeStr;
+
+    if (extractedFields.date && extractedFields.time && (extractedFields.doctorId || extractedFields.doctorName)) {
+      console.log('All booking fields extracted, sending to Android');
+      flushBooking();
+    }
+  }
+
+  // ── Booking confirmation detected (assistant says "booked") ──
+  if (role === 'assistant' && !bookingSent && BOOKING_CONFIRM_PATTERNS.some(p => p.test(text))) {
+    console.log('Booking confirmation detected');
+    flushBooking(combinedContext);
+  }
+
+  // ── Booking was confirmed AND sent → auto-end after pause ──
+  if (bookingSent && !endTriggered) {
+    // If we just sent booking, schedule auto-end
+    scheduleEndAfterBooking();
+    startInactivityMonitor();
+  }
+
+  // ── Goodbye / end-call intent detection ──
+  if (role === 'assistant' && !endTriggered && END_CALL_PATTERNS.some(p => p.test(text))) {
+    console.log('End-call pattern detected');
+    // Flush any unsent booking
+    if (!bookingSent) flushBooking(combinedContext);
+    
+    // If booking was sent, short delay; if no booking, quick end
+    if (bookingSent) {
+      scheduleEndAfterBooking();
+    } else {
+      scheduleEndQuick();
+    }
+  }
+}
+
+// ── Fetch doctors availability ──
+async function fetchAvailability() {
+  try {
+    const url = API_BASE + 'doctors/availability?days=7';
+    const resp = await fetch(url);
+    const json = await resp.json();
+    if (json.success && json.data) {
+      availableDoctors = json.data.map(d => ({
+        id: d.id || d.doctorId,
+        firstName: d.firstName,
+        lastName: d.lastName,
+        specialties: d.specialties,
+        fee: d.fee
+      }));
+      if (vapi && vapi.isConnected) {
+        vapi.updateMetadata({ availableDoctors, doctorCount: String(availableDoctors.length) });
+      }
+    }
+  } catch(e) {
+    console.error('Failed to fetch availability:', e);
+  }
+}
+
+// ── Start the call ──
+function start() {
+  try {
+    vapi = new Vapi(PUBLIC_KEY);
+  } catch (e) {
+    notifyState('error', { message: 'Setup failed: ' + (e?.message || 'unknown') });
+    return;
+  }
+
+  vapi.on('call-start', () => {
+    connected = true;
+    callStartTime = Date.now();
+    notifyState('connected', {});
+    startTimer();
+  });
+
+  vapi.on('call-end', () => {
+    connected = false;
+    stopTimer();
+    notifyState('disconnected', {});
+
+    // Final flush of unsent booking
+    if (!bookingSent) {
+      const fullContext = [...assistantContext, ...userContext].join(' ');
+      flushBooking(fullContext);
+    }
+    if (bookingSent) notifyBookingDone(extractedFields);
+
+    // Notify Android of end
+    notifyCallEnded();
+  });
+
+  vapi.on('speech-start', () => {
+    notifyState('speaking', {});
+  });
+
+  vapi.on('speech-end', () => {
+    if (connected) notifyState('listening', {});
+  });
+
+  // ── Function calls from VAPI assistant ──
+  vapi.on('function-call', (funcCall) => {
+    console.log('Function call:', funcCall.name, JSON.stringify(funcCall.parameters));
+
+    if (/^(endCall|end_call|hangup|disconnect|end)$/i.test(funcCall.name)) {
+      vapi.sendFunctionResult(funcCall.id, { success: true });
+      if (!endTriggered) scheduleEnd(500);
+      return;
+    }
+
+    if (/^(bookAppointment|scheduleAppointment|book_appointment|createAppointment|book)$/i.test(funcCall.name)) {
+      const p = funcCall.parameters;
+      console.log('Book function params:', JSON.stringify(p));
+      
+      // Forward structured data directly (most reliable path)
+      if (p.doctorId) notifyMetadata('doctorId', p.doctorId);
+      if (p.doctorName) notifyMetadata('doctorName', p.doctorName);
+      if (p.appointmentDate || p.date) notifyMetadata('appointmentDate', p.appointmentDate || p.date);
+      if (p.startTime || p.time || p.appointmentTime) notifyMetadata('appointmentTime', p.startTime || p.time || p.appointmentTime);
+      if (p.reason) notifyMetadata('reason', p.reason);
+      
+      bookingSent = true;
+      
+      vapi.sendFunctionResult(funcCall.id, { success: true, message: 'Appointment data captured' });
+      
+      // Start booking end timer
+      scheduleEndAfterBooking();
+      startInactivityMonitor();
+      return;
+    }
+  });
+
+  // ── Transcript events from VAPI ──
+  vapi.on('message', (msg) => {
+    if (msg && msg.type === 'transcript' && msg.transcript) {
+      const role = msg.role === 'assistant' ? 'assistant' : 'user';
+      if (msg.transcriptType === 'final') {
+        addBubble(role, msg.transcript);
+      }
+    }
+  });
+
+  vapi.on('error', (e) => {
+    console.error('VAPI error:', e);
+    const errorMsg = (typeof e === 'string' ? e : e?.message) || 'Something went wrong';
+    notifyState('error', { message: errorMsg });
+  });
+
+  const metadata = {};
+  if (USER_JWT) metadata.jwt = USER_JWT;
+  if (USER_NAME) metadata.userName = USER_NAME;
+  metadata.source = 'mediconnect-android';
+  if (availableDoctors.length > 0) {
+    metadata.availableDoctors = availableDoctors;
+    metadata.doctorCount = String(availableDoctors.length);
+  }
+
+  try {
+    vapi.start(ASSISTANT_ID, { metadata });
+    notifyState('connecting', {});
+  } catch (e) {
+    notifyState('error', { message: e?.message || 'Failed to start' });
+  }
+}
+
+// ── End the call ──
+function end() {
+  if (endTriggered && connected === false) return;
+  if (!endTriggered) endTriggered = true;
+
+  // Final flush
+  if (!bookingSent) {
+    const ctx = [...assistantContext, ...userContext].join(' ');
+    flushBooking(ctx);
+  }
+  if (bookingSent) notifyBookingDone(extractedFields);
+
+  stopTimer();
+  if (vapi) {
+    try { vapi.stop(); } catch(e) {}
+  }
+}
+
+// ── Timer ──
+function startTimer() {
+  callStartTime = Date.now();
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    if (!callStartTime) return;
+    const elapsed = Math.floor((Date.now() - callStartTime) / 1000);
+    const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+    const secs = String(elapsed % 60).padStart(2, '0');
+    notifyState('timer', { elapsed, display: mins + ':' + secs });
+  }, 1000);
+}
+
+function stopTimer() {
+  clearInterval(timerInterval);
+}
+
+// ── Doctor name matching (unchanged logic) ──
+function findDoctor(text) {
+  if (!text) return null;
+  function matched(doc) { return { id: doc.id, firstName: doc.firstName, lastName: doc.lastName }; }
+  if (availableDoctors.length > 0) {
+    const m1 = text.match(/(?:Dr\.?|Doctor)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/);
+    let nameStr = m1 ? m1[1].trim().toLowerCase() : null;
+    if (!nameStr) {
+      for (const doc of availableDoctors) {
+        if (new RegExp('\\b' + doc.lastName.toLowerCase() + '\\b', 'i').test(text)) return matched(doc);
+      }
+    } else {
+      for (const doc of availableDoctors) {
+        if ((doc.firstName + ' ' + doc.lastName).toLowerCase() === nameStr) return matched(doc);
+      }
+      for (const doc of availableDoctors) {
+        if (nameStr.includes(doc.lastName.toLowerCase()) || doc.lastName.toLowerCase().includes(nameStr)) return matched(doc);
+      }
+    }
+  }
+  const raw = text.match(/(?:Dr\.?|Doctor)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i);
+  if (raw) return { id: null, firstName: raw[1].trim(), lastName: '' };
+  return null;
+}
+
+function extractDate(text) {
+  if (!text) return null;
+  const iso = text.match(/\b(\d{4}-\d{2}-\d{2})\b/);
+  if (iso) return iso[1];
+  const lower = text.toLowerCase();
+  const today = new Date();
+  if (/\btoday\b/.test(lower)) return fmtDate(today);
+  if (/\btomorrow\b/.test(lower)) return fmtDate(new Date(today.getTime() + 86400000));
+  const stripped = text.replace(/(\d+)(st|nd|rd|th)\b/gi, '$1');
+  const monthDayYear = stripped.match(/(\w+)\s+(\d{1,2})[,\s]+(\d{4})\b/);
+  if (monthDayYear) {
+    const m = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(monthDayYear[1].substring(0,3).toLowerCase());
+    if (m >= 0) return monthDayYear[3] + '-' + String(m + 1).padStart(2, '0') + '-' + String(monthDayYear[2]).padStart(2, '0');
+  }
+  const dayMonthYear = stripped.match(/\b(\d{1,2})\s+(\w+)\s+(\d{4})\b/);
+  if (dayMonthYear) {
+    const m = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(dayMonthYear[2].substring(0,3).toLowerCase());
+    if (m >= 0) return dayMonthYear[3] + '-' + String(m + 1).padStart(2, '0') + '-' + String(dayMonthYear[1]).padStart(2, '0');
+  }
+  const dayNames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+  const nextDayMatch = lower.match(/next\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday)/);
+  if (nextDayMatch) {
+    const targetDay = dayNames.indexOf(nextDayMatch[1]);
+    if (targetDay >= 0) {
+      const currentDay = today.getDay();
+      let daysUntil = targetDay - currentDay;
+      if (daysUntil <= 0) daysUntil += 7;
+      return fmtDate(new Date(today.getTime() + daysUntil * 86400000));
+    }
+  }
+  return null;
+}
+
+function fmtDate(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function extractTime(text) {
+  const colonMatch = text.match(/\b(\d{1,2}:\d{2})\s*(AM|PM)?\b/i);
+  if (colonMatch) {
+    let t = colonMatch[1];
+    if (colonMatch[2]) t = t + ' ' + colonMatch[2].toUpperCase();
+    return t;
+  }
+  const noColonMatch = text.match(/\b(\d{1,2})\s*(AM|PM)\b/i);
+  if (noColonMatch) return noColonMatch[1] + ':00 ' + noColonMatch[2].toUpperCase();
+  return null;
+}
+
+// ── Exported bridge for Kotlin to call ──
+window.VapiBridge = {
+  start, end,
+  setAuth(jwt, userName) { USER_JWT = jwt || ''; USER_NAME = userName || ''; },
+  setDoctors(jsonStr) {
+    try {
+      const docs = JSON.parse(jsonStr);
+      availableDoctors = docs;
+      if (vapi && vapi.isConnected) vapi.updateMetadata({ availableDoctors: docs, doctorCount: String(docs.length) });
+    } catch(e) { console.error('setDoctors failed:', e); }
+  },
+  resetState() {
+    endTriggered = false;
+    bookingSent = false;
+    assistantContext = [];
+    userContext = [];
+    extractedFields = { doctorId: null, doctorName: null, date: null, time: null, reason: null };
+    bookingEndTimeoutId = null;
+    if (inactivityCheckId) { clearInterval(inactivityCheckId); inactivityCheckId = null; }
+  },
+};
+
+fetchAvailability();
+start();
+</script>
 </head>
-<body>
-  <!-- Timer bar -->
-  <div class="timer-bar" id="timerBar">
-    <span class="live-dot" id="liveDot"></span>
-    <span class="timer-text" id="timerText">00:00</span>
-  </div>
-
-  <div class="mic-area">
-    <div class="mic-circle" id="micCircle">
-      🎤 <div class="ring"></div>
-    </div>
-    <div class="status-text" id="statusText">Connecting...</div>
-    <div class="sub-status" id="subStatus">Starting AI voice assistant</div>
-  </div>
-
-  <div class="transcript-window" id="transcriptWindow" aria-live="polite">
-    <div class="transcript-empty" id="transcriptEmpty">Conversation will appear here</div>
-  </div>
-
-  <div class="booking-overlay" id="bookingOverlay">
-    <div class="booking-card">
-      <div class="booking-check">✅</div>
-      <div class="booking-title">Appointment Booked!</div>
-      <div class="booking-sub">Your appointment has been confirmed</div>
-      <div id="bookingDetails"></div>
-      <button class="booking-close" id="bookingCloseBtn">Close</button>
-    </div>
-  </div>
-
-  <script type="importmap">
-  { "imports": { "@vapi-ai/web": "https://esm.sh/@vapi-ai/web@latest" } }
-  </script>
-  <script type="module">
-    import Vapi from '@vapi-ai/web';
-
-    const ASSISTANT_ID = '__ASSISTANT_ID__';
-    const PUBLIC_KEY  = '__PUBLIC_KEY__';
-    let USER_JWT = '__USER_JWT__';
-    let USER_NAME = '__USER_NAME__';
-
-    const micCircle = document.getElementById('micCircle');
-    const statusText = document.getElementById('statusText');
-    const subStatus = document.getElementById('subStatus');
-    const transcriptWindow = document.getElementById('transcriptWindow');
-    const transcriptEmpty = document.getElementById('transcriptEmpty');
-    const bookingOverlay = document.getElementById('bookingOverlay');
-    const bookingDetails = document.getElementById('bookingDetails');
-    const timerText = document.getElementById('timerText');
-    const liveDot = document.getElementById('liveDot');
-
-    let vapi = null;
-    let connected = false;
-    let interimEl = null;
-    let autoScroll = true;
-    let callStartTime = null;
-    let timerInterval = null;
-
-    // API base URL — injected by Android at template build time
-    const API_BASE = '__API_BASE__';
-    let availableDoctors = [];
-
-    async function fetchAvailability() {
-      try {
-        const url = API_BASE + 'doctors/availability?days=7';
-        const resp = await fetch(url);
-        const json = await resp.json();
-        if (json.success && json.data) {
-          availableDoctors = json.data.map(d => ({
-            firstName: d.firstName,
-            lastName: d.lastName,
-            specialties: d.specialties,
-            fee: d.fee,
-            slots: d.availableDates || {}
-          }));
-          if (vapi && vapi.isConnected) {
-            vapi.updateMetadata({
-              availableDoctors: availableDoctors,
-              doctorCount: String(availableDoctors.length)
-            });
-          }
-          console.log('Loaded ' + availableDoctors.length + ' doctors with availability');
-        }
-      } catch(e) {
-        console.error('Failed to fetch availability:', e);
-      }
-    }
-    fetchAvailability();
-
-    // Scroll tracking
-    transcriptWindow.addEventListener('scroll', () => {
-      const atBottom = transcriptWindow.scrollHeight - transcriptWindow.scrollTop - transcriptWindow.clientHeight < 40;
-      autoScroll = atBottom;
-    });
-    function scrollToBottom() {
-      if (autoScroll) transcriptWindow.scrollTo({ top: transcriptWindow.scrollHeight, behavior: 'smooth' });
-    }
-
-    // Timer
-    function startTimer() {
-      callStartTime = Date.now();
-      clearInterval(timerInterval);
-      timerInterval = setInterval(() => {
-        if (!callStartTime) return;
-        const elapsed = Math.floor((Date.now() - callStartTime) / 1000);
-        const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
-        const secs = String(elapsed % 60).padStart(2, '0');
-        timerText.textContent = mins + ':' + secs;
-      }, 1000);
-    }
-    function stopTimer() {
-      clearInterval(timerInterval);
-      liveDot.style.display = 'none';
-    }
-
-    function setStatus(state, msg, sub) {
-      micCircle.className = 'mic-circle';
-      if (state) micCircle.classList.add(state);
-      statusText.textContent = msg || '';
-      subStatus.textContent = sub || '';
-      transcriptWindow.classList.toggle('active', connected);
-    }
-
-    function clearInterim() {
-      if (interimEl && interimEl.parentNode) { interimEl.parentNode.removeChild(interimEl); interimEl = null; }
-    }
-
-    function addBubble(role, text) {
-      clearInterim();
-      if (transcriptEmpty && transcriptEmpty.parentNode) { transcriptEmpty.parentNode.removeChild(transcriptEmpty); }
-      const bubble = document.createElement('div');
-      bubble.className = 'chat-bubble ' + role;
-      bubble.textContent = text;
-      transcriptWindow.appendChild(bubble);
-      scrollToBottom();
-
-      // Push to Android bridge for API storage
-      try {
-        if (window.AndroidBridge) {
-          const ts = new Date().toISOString();
-          window.AndroidBridge.onTranscript(role, text, ts, 'final');
-        }
-      } catch(e) { console.warn('Bridge onTranscript failed', e); }
-    }
-
-    function showInterim(text) {
-      if (!text || !text.trim()) { clearInterim(); return; }
-      if (!interimEl) { clearInterim(); interimEl = document.createElement('div'); interimEl.className = 'live-interim'; transcriptWindow.appendChild(interimEl); }
-      interimEl.textContent = text;
-      scrollToBottom();
-    }
-
-    function showBookingSummary(data) {
-      bookingDetails.innerHTML = '';
-      const fields = [
-        { label: 'Doctor', value: data.doctorName || '\u2014' },
-        { label: 'Date', value: data.date || '\u2014' },
-        { label: 'Time', value: data.time || '\u2014' },
-        { label: 'Fee', value: data.fee ? '$' + data.fee : '\u2014' },
-      ];
-      fields.forEach(f => {
-        const row = document.createElement('div');
-        row.className = 'booking-row';
-        row.innerHTML = '<span class="booking-label">' + f.label + '</span><span class="booking-value">' + f.value + '</span>';
-        bookingDetails.appendChild(row);
-      });
-      bookingOverlay.classList.add('show');
-    }
-
-    document.getElementById('bookingCloseBtn').addEventListener('click', () => {
-      bookingOverlay.classList.remove('show');
-      try { window.VapiBridge?.onRemoteEnd?.(); } catch(e) {}
-    });
-
-    function start() {
-      try { vapi = new Vapi(PUBLIC_KEY); } catch (e) {
-        setStatus('error', 'Setup failed', e?.message || 'Please try again');
-        return;
-      }
-
-      vapi.on('call-start', () => {
-        connected = true;
-        startTimer();
-        setStatus('listening', 'Connected', "I'm listening \u2014 go ahead!");
-        transcriptWindow.scrollTo({ top: transcriptWindow.scrollHeight });
-      });
-
-      vapi.on('call-end', () => {
-        connected = false;
-        stopTimer();
-        clearInterim();
-        setStatus(null, 'Call ended', 'You can close this window');
-        try { window.VapiBridge?.onRemoteEnd?.(); } catch(e) {}
-        // Notify Android that Vapi ended the call (server-side hangup)
-        try { if (window.AndroidBridge) window.AndroidBridge.onCallEnded(); } catch(e) {}
-      });
-
-      vapi.on('speech-start', () => { setStatus('speaking', 'Assistant is speaking...', ''); });
-      vapi.on('speech-end', () => { if (connected) setStatus('listening', 'Listening...', 'Your turn to speak'); });
-
-      vapi.on('message', (msg) => {
-        if (msg && msg.type === 'transcript' && msg.transcript) {
-          const role = msg.role === 'assistant' ? 'assistant' : 'user';
-          if (msg.transcriptType === 'final') {
-            addBubble(role, msg.transcript);
-            if (role === 'assistant' && /booked|confirmed|appointment.*set|scheduled/i.test(msg.transcript)) {
-              setTimeout(() => { try { window.VapiBridge?.onBookingComplete?.(); } catch(e) {} }, 1500);
-            }
-          } else if (msg.transcriptType === 'partial' && role === 'user') {
-            showInterim(msg.transcript);
-          }
-        }
-      });
-
-      vapi.on('error', (e) => {
-        console.error('VAPI error:', e);
-        const errorMsg = (typeof e === 'string' ? e : e?.message) || 'Something went wrong';
-        if (!connected) {
-          if (/microphone|permission|denied/i.test(errorMsg)) setStatus('error', 'Microphone access needed', 'Allow mic in your phone settings');
-          else if (/network|fetch|timeout/i.test(errorMsg)) setStatus('error', 'Connection problem', 'Check your internet');
-          else setStatus('error', 'Connection error', errorMsg.length < 60 ? errorMsg : 'Please try again');
-        } else {
-          setStatus('speaking', 'Reconnecting...', 'Just a moment');
-          setTimeout(() => { if (connected) setStatus('listening', 'Listening...', 'Your turn to speak'); }, 2000);
-        }
-      });
-
-      setStatus(null, 'Connecting...', 'Establishing voice connection');
-
-      // Build metadata so VAPI backend can resolve the user
-      const metadata = {};
-      if (USER_JWT) metadata.jwt = USER_JWT;
-      if (USER_NAME) metadata.userName = USER_NAME;
-      metadata.source = 'mediconnect-android';
-
-      // Pass available doctors so the assistant can suggest names
-      if (availableDoctors.length > 0) {
-        metadata.availableDoctors = availableDoctors;
-        metadata.doctorCount = String(availableDoctors.length);
-      }
-
-      try {
-        // Simple start with just the assistant ID and metadata
-        vapi.start(ASSISTANT_ID, { metadata });
-      } catch (e) {
-        setStatus('error', 'Failed to start', e?.message || 'Please try again');
-      }
-    }
-
-    function end() {
-      stopTimer();
-      try { if (vapi) vapi.stop(); } catch(e) {}
-    }
-
-    start();
-
-    window.VapiBridge = {
-      start, end,
-      showBooking: (data) => showBookingSummary(data),
-      setAuth(jwt, userName) { USER_JWT = jwt || ''; USER_NAME = userName || ''; },
-      /** Called by Android to pass the doctors list after WebView loads */
-      setDoctors: function(jsonStr) {
-        try {
-          const docs = JSON.parse(jsonStr);
-          availableDoctors = docs;
-          if (vapi && vapi.isConnected) {
-            // If already connected, update metadata
-            vapi.updateMetadata({ availableDoctors: docs, doctorCount: String(docs.length) });
-          }
-        } catch(e) { console.error('setDoctors failed:', e); }
-      },
-      onRemoteEnd: null,
-      onBookingComplete: null,
-    };
-  </script>
-</body>
+<body></body>
 </html>

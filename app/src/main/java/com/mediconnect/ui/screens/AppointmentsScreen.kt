@@ -15,6 +15,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.NavController
 import com.mediconnect.data.api.MediConnectApi
 import com.mediconnect.data.model.AppointmentSummary
@@ -46,7 +49,13 @@ fun AppointmentsScreen(navController: NavController) {
         }
     }
 
-    LaunchedEffect(Unit) { loadAppointments("all") }
+    // Refresh appointments every time the screen resumes (handles voice-call booking) 
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            loadAppointments("all")
+        }
+    }
 
     // Filter locally — API returns uppercase statuses (PENDING, CONFIRMED, COMPLETED, CANCELLED, NO_SHOW)
     val filteredAppointments = remember(appointments, selectedFilter) {

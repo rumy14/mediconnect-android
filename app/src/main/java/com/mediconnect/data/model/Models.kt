@@ -167,14 +167,10 @@ data class VoiceCallTranscriptEntry(
 
 @Serializable
 data class SaveVoiceCallRequest(
-    @SerialName("vapi_call_id")
     val vapiCallId: String? = null,
     val status: String,
-    @SerialName("duration_seconds")
     val durationSeconds: Int,
-    @SerialName("started_at")
     val startedAt: String,
-    @SerialName("ended_at")
     val endedAt: String,
     val transcript: List<VoiceCallTranscriptEntry>,
     val summary: String? = null,
@@ -187,13 +183,10 @@ data class VoiceCallResponse(
     @SerialName("user_id")
     val userId: String? = null,
     val status: String,
-    @SerialName("duration_seconds")
     val durationSeconds: Int? = null,
     @SerialName("transcript_count")
     val transcriptCount: Int? = null,
-    @SerialName("started_at")
     val startedAt: String? = null,
-    @SerialName("ended_at")
     val endedAt: String? = null
 )
 
@@ -201,11 +194,11 @@ data class VoiceCallResponse(
 data class VoiceCallSummary(
     val id: String,
     val status: String,
-    @SerialName("duration_seconds")
+    
     val durationSeconds: Int? = null,
-    @SerialName("started_at")
+    
     val startedAt: String? = null,
-    @SerialName("ended_at")
+    
     val endedAt: String? = null,
     val summary: String? = null,
     val metadata: Map<String, String>? = null,
@@ -220,14 +213,10 @@ data class VoiceCallDetail(
     val id: String,
     @SerialName("user_id")
     val userId: String? = null,
-    @SerialName("vapi_call_id")
     val vapiCallId: String? = null,
     val status: String,
-    @SerialName("duration_seconds")
     val durationSeconds: Int? = null,
-    @SerialName("started_at")
     val startedAt: String? = null,
-    @SerialName("ended_at")
     val endedAt: String? = null,
     val transcript: List<VoiceCallTranscriptEntry>? = null,
     val summary: String? = null,
@@ -293,9 +282,7 @@ data class DoctorDetailInfo(
 @Serializable
 data class BookVoiceCallRequest(
     val doctorId: String,
-    @SerialName("appointment_date")
     val appointmentDate: String,
-    @SerialName("start_time")
     val startTime: String,
     val reason: String? = null
 )
@@ -319,7 +306,7 @@ data class OutboundCallRequest(
 data class OutboundCallResponse(
     @SerialName("call_id")
     val callId: String? = null,
-    @SerialName("vapi_call_id")
+    
     val vapiCallId: String? = null,
     @SerialName("phone_number")
     val phoneNumber: String? = null,
