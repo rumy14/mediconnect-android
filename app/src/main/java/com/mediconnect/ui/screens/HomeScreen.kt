@@ -34,9 +34,7 @@ fun HomeScreen(navController: NavController) {
     var specialties by remember { mutableStateOf<List<Specialty>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var showAiVoice by remember { mutableStateOf(false) }
-    var voiceCallHadBooking by remember { mutableStateOf(false) }
-    var showSuggestionBooking by remember { mutableStateOf(false) }
-    var suggestionFabVisible by remember { mutableStateOf(false) }
+    var showQuickBook by remember { mutableStateOf(false) }
 
     // Load specialties on first composition
     LaunchedEffect(Unit) {
@@ -51,28 +49,15 @@ fun HomeScreen(navController: NavController) {
 
     Scaffold(
         floatingActionButton = {
-            if (suggestionFabVisible) {
-                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    // Suggestion button (above the mic button)
-                    SmallFloatingActionButton(
-                        onClick = { showSuggestionBooking = true },
-                        containerColor = Color(0xFFF59E0B)
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = "Quick Book", tint = Color.White)
-                    }
-                    // Mic button (below)
-                    FloatingActionButton(
-                        onClick = {
-                            suggestionFabVisible = false
-                            voiceCallHadBooking = false
-                            showAiVoice = true
-                        },
-                        containerColor = MaterialTheme.colorScheme.primary
-                    ) {
-                        Icon(Icons.Default.Mic, contentDescription = "AI Assistant")
-                    }
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Quick Book button (top)
+                SmallFloatingActionButton(
+                    onClick = { showQuickBook = true },
+                    containerColor = Color(0xFFF59E0B)
+                ) {
+                    Icon(Icons.Default.DateRange, contentDescription = "Quick Book", tint = Color.White)
                 }
-            } else {
+                // AI Voice button (bottom)
                 FloatingActionButton(
                     onClick = { showAiVoice = true },
                     containerColor = MaterialTheme.colorScheme.primary
@@ -231,17 +216,9 @@ fun HomeScreen(navController: NavController) {
     // ── AI Voice Assistant ──
     VapiVoiceCallDialog(
         show = showAiVoice,
-        onDismiss = {
-            showAiVoice = false
-            // Show suggestion button if voice call didn't result in a booking
-            if (!voiceCallHadBooking) {
-                suggestionFabVisible = true
-            }
-        },
+        onDismiss = { showAiVoice = false },
         onAppointmentBooked = {
-            voiceCallHadBooking = true
             showAiVoice = false
-            suggestionFabVisible = false
             navController.navigate(Screen.Appointments.route) {
                 launchSingleTop = true
                 popUpTo(Screen.Home.route) { saveState = true }
@@ -249,13 +226,12 @@ fun HomeScreen(navController: NavController) {
         }
     )
 
-    // ── Suggestion Booking (when voice call fails to book) ──
+    // ── Quick Book (manual booking dialog) ──
     SuggestionBookingDialog(
-        show = showSuggestionBooking,
-        onDismiss = { showSuggestionBooking = false },
+        show = showQuickBook,
+        onDismiss = { showQuickBook = false },
         onBookingSuccess = {
-            showSuggestionBooking = false
-            suggestionFabVisible = false
+            showQuickBook = false
             navController.navigate(Screen.Appointments.route) {
                 launchSingleTop = true
                 popUpTo(Screen.Home.route) { saveState = true }
