@@ -125,7 +125,7 @@ data class UserNameWithEmail(
     val id: String? = null,
     val firstName: String,
     val lastName: String,
-    val email: String,
+    val email: String? = null,
     val phone: String? = null
 )
 
