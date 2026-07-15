@@ -100,18 +100,24 @@ fun SuggestionBookingDialog(
     }
 
     // Fetch slots when doctor + date selected
-    LaunchedEffect(selectedDoctor, selectedDate) {
-        if (selectedDoctor != null && selectedDate != null) {
+    // Use current step as additional trigger — re-fetch when user lands on TIME step
+    val fetchSlots = remember(selectedDoctor, selectedDate) {
+        selectedDoctor != null && selectedDate != null
+    }
+    LaunchedEffect(fetchSlots) {
+        if (fetchSlots) {
             loadingSlots = true
+            availableSlots = emptyList()
             try {
                 val resp = api.getDoctorSlots(selectedDoctor!!.id, selectedDate!!)
-                if (resp.success) {
-                    availableSlots = resp.data?.filter { !it.isBooked } ?: emptyList()
+                if (resp.success && resp.data != null) {
+                    availableSlots = resp.data.filter { !it.isBooked }
                 } else {
                     availableSlots = emptyList()
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
                 availableSlots = emptyList()
+                android.util.Log.e("QuickBook", "Slot fetch failed", e)
             }
             loadingSlots = false
         }
