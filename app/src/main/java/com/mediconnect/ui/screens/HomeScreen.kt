@@ -52,15 +52,15 @@ fun HomeScreen(navController: NavController) {
     Scaffold(
         floatingActionButton = {
             if (suggestionFabVisible) {
-                Box {
-                    // Stack FABs if suggestion is visible
-                    FloatingActionButton(
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    // Suggestion button (above the mic button)
+                    SmallFloatingActionButton(
                         onClick = { showSuggestionBooking = true },
-                        containerColor = Color(0xFFF59E0B),
-                        modifier = Modifier.padding(bottom = 64.dp)
+                        containerColor = Color(0xFFF59E0B)
                     ) {
-                        Icon(Icons.Default.Lightbulb, contentDescription = "Quick Book", tint = Color.White)
+                        Icon(Icons.Default.Add, contentDescription = "Quick Book", tint = Color.White)
                     }
+                    // Mic button (below)
                     FloatingActionButton(
                         onClick = {
                             suggestionFabVisible = false
